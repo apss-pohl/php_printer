@@ -1394,13 +1394,6 @@ PHP_FUNCTION(printer_draw_pie)
 	zend_long rec_x, rec_y, rec_x1, rec_y1, rad1_x, rad1_y, rad2_x, rad2_y;
 	printer *resource;
 
-	if( zend_get_parameters_ex(9, &arg1, &arg2, &arg3, &arg4, &arg5, &arg6, &arg7, &arg8, &arg9) == FAILURE ) {
-		WRONG_PARAM_COUNT;
-	}
-
-	ZEND_FETCH_RESOURCE(resource, printer *, arg1, -1, "Printer Handle", le_printer);
-
-
 	if (zend_parse_parameters(ZEND_NUM_ARGS(), "rllllllll", &zres, &rec_x, &rec_y, &rec_x1, &rec_y1, &rad1_x, &rad1_y, &rad2_x, &rad2_y) == FAILURE) {
 		RETURN_THROWS();
 	}
