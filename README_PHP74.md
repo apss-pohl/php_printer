@@ -47,14 +47,21 @@ The extension has been updated from PHP 5.6 API to PHP 7.4+ API with full PHP 8 
 
 ## Building the Extension
 
-This is a Windows-only extension. To build:
+This is a Windows-only extension designed to be built as a shared/external extension (DLL).
 
 ### Windows with PHP SDK
+
+Build as a shared extension:
 ```cmd
-cd path\to\php-sdk
+cd path\to\php_printer
 phpize
-configure --enable-printer
+configure --enable-printer=shared
 nmake
+```
+
+The build produces `php_printer.dll` which should be copied to your PHP extensions directory and loaded via `php.ini`:
+```ini
+extension=php_printer
 ```
 
 ### Requirements

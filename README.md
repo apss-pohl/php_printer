@@ -44,9 +44,16 @@ This extension allows PHP scripts on Windows to:
 
 ## Building on Windows
 
-### Step 1: Set Up PHP SDK
+This extension is designed to be built as an external (shared) extension, resulting in a `php_printer.dll` file that can be dynamically loaded by PHP.
 
-Download and set up the PHP SDK for Windows:
+### Method 1: Build as Standalone Extension (Recommended)
+
+This method builds the extension separately from PHP, which is the recommended approach for most users.
+
+#### Step 1: Prerequisites
+
+- Install PHP 7.4+ or PHP 8.x on your Windows system
+- Download and set up the PHP SDK for Windows:
 
 ```cmd
 git clone https://github.com/php/php-sdk-binary-tools.git c:\php-sdk
@@ -54,7 +61,61 @@ cd c:\php-sdk
 phpsdk-vs16-x64.bat
 ```
 
-### Step 2: Get PHP Source
+#### Step 2: Get Extension Source
+
+```cmd
+git clone https://github.com/apss-pohl/php_printer.git
+cd php_printer
+```
+
+#### Step 3: Configure for Shared Build
+
+```cmd
+phpize
+configure --enable-printer=shared --with-php-build=C:\php-sdk\phpdev\vs16\x64\deps
+```
+
+For PHP 7.4, use `vc15` instead of `vs16`:
+```cmd
+configure --enable-printer=shared --with-php-build=C:\php-sdk\phpdev\vc15\x64\deps
+```
+
+#### Step 4: Build
+
+```cmd
+nmake
+```
+
+#### Step 5: Install
+
+Copy the compiled DLL to your PHP extensions directory:
+
+```cmd
+copy x64\Release_TS\php_printer.dll C:\php\ext\
+```
+
+Or for NTS (Non-Thread-Safe) builds:
+```cmd
+copy x64\Release\php_printer.dll C:\php\ext\
+```
+
+#### Step 6: Enable Extension
+
+Add to your `php.ini`:
+```ini
+extension=php_printer
+```
+
+Verify installation:
+```cmd
+php -m | findstr printer
+```
+
+### Method 2: Build with PHP Source (Advanced)
+
+This method builds the extension alongside PHP source code, still producing a shared extension.
+
+#### Step 1: Get PHP Source
 
 For PHP 7.4:
 ```cmd
@@ -74,7 +135,7 @@ cd php-8.3
 git checkout PHP-8.3
 ```
 
-### Step 3: Get Extension Source
+#### Step 2: Get Extension Source
 
 ```cmd
 cd ext
@@ -82,28 +143,17 @@ git clone https://github.com/apss-pohl/php_printer.git printer
 cd ..
 ```
 
-### Step 4: Build PHP with Printer Extension
+#### Step 3: Configure and Build as Shared Extension
 
 ```cmd
 buildconf
-configure --disable-all --enable-cli --enable-printer
+configure --disable-all --enable-cli --enable-printer=shared
 nmake
 ```
 
-### Step 5: Verify Build
+#### Step 4: Install
 
-```cmd
-nmake test TESTS=ext/printer/
-```
-
-Or manually:
-```cmd
-x64\Release_TS\php.exe -m | findstr printer
-```
-
-### Step 6: Install
-
-Copy the compiled `php_printer.dll` from the build directory to your PHP extensions directory:
+Copy the compiled DLL:
 
 ```cmd
 copy x64\Release_TS\php_printer.dll C:\php\ext\
@@ -111,41 +161,12 @@ copy x64\Release_TS\php_printer.dll C:\php\ext\
 
 Add to your `php.ini`:
 ```ini
-extension=php_printer.dll
+extension=php_printer
 ```
 
 Verify installation:
 ```cmd
 php -m | findstr printer
-```
-
-## Building Standalone (Without Full PHP Build)
-
-If you already have PHP 7.4+ installed:
-
-### Step 1: Use phpize
-
-```cmd
-cd path\to\php_printer
-phpize
-```
-
-### Step 2: Configure
-
-```cmd
-configure --with-php-build=C:\php-sdk\phpdev\vc15\x64\deps --enable-printer
-```
-
-### Step 3: Build
-
-```cmd
-nmake
-```
-
-### Step 4: Install
-
-```cmd
-copy Release\php_printer.dll C:\php\ext\
 ```
 
 ## Quick Start Example
