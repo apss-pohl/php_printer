@@ -121,7 +121,7 @@ ZEND_END_ARG_INFO()
 
 ZEND_BEGIN_ARG_INFO_EX(arginfo_printer_create_brush, 0, 0, 2)
 	ZEND_ARG_INFO(0, style)
-	ZEND_ARG_INFO(0, color)
+	ZEND_ARG_INFO(0, color_or_file)
 ZEND_END_ARG_INFO()
 
 ZEND_BEGIN_ARG_INFO_EX(arginfo_printer_delete_brush, 0, 0, 1)
@@ -519,7 +519,7 @@ PHP_FUNCTION(printer_write)
 	size_t content_len;
 	printer *resource;
 	DOC_INFO_1 docinfo;
-	int sd, sp = 0, recieved;
+	int sd, sp = 0, received;
 
 	if (zend_parse_parameters(ZEND_NUM_ARGS(), "rs", &zres, &content, &content_len) == FAILURE) {
 		RETURN_THROWS();
@@ -537,7 +537,7 @@ PHP_FUNCTION(printer_write)
 	sp = StartPagePrinter(resource->handle);
 
 	if( sd && sp ) {
-		WritePrinter(resource->handle, content, content_len, &recieved);
+		WritePrinter(resource->handle, content, content_len, &received);
 		EndPagePrinter(resource->handle);
 		EndDocPrinter(resource->handle);
 		RETURN_TRUE;
@@ -1083,30 +1083,30 @@ PHP_FUNCTION(printer_select_pen)
 /* }}} */
 
 
-/* {{{ proto mixed printer_create_brush(resource handle)
-   Create a brush */
+/* {{{ proto mixed printer_create_brush(int style, string color_or_file)
+   Create a brush - color_or_file is a hex color for solid/hatch brushes, or bitmap path for custom brushes */
 PHP_FUNCTION(printer_create_brush)
 {
 	zend_long style;
-	char *color;
-	size_t color_len;
+	char *value;
+	size_t value_len;
 	HBRUSH brush;
 	HBITMAP bmp;
 
-	if (zend_parse_parameters(ZEND_NUM_ARGS(), "ls", &style, &color, &color_len) == FAILURE) {
+	if (zend_parse_parameters(ZEND_NUM_ARGS(), "ls", &style, &value, &value_len) == FAILURE) {
 		RETURN_THROWS();
 	}
 
 	switch(style) {
 		case BRUSH_SOLID:
-			brush = CreateSolidBrush(hex_to_rgb(color));
+			brush = CreateSolidBrush(hex_to_rgb(value));
 			break;
 		case BRUSH_CUSTOM:
-			bmp = LoadImage(0, color, IMAGE_BITMAP, 0, 0, LR_LOADFROMFILE);
+			bmp = LoadImage(0, value, IMAGE_BITMAP, 0, 0, LR_LOADFROMFILE);
 			brush = CreatePatternBrush(bmp);
 			break;
 		default:
-			brush = CreateHatchBrush(style, hex_to_rgb(color));
+			brush = CreateHatchBrush(style, hex_to_rgb(value));
 	}
 
 	if(!brush) {
