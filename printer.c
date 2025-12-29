@@ -44,43 +44,231 @@ static int le_printer, le_brush, le_pen, le_font;
 
 COLORREF hex_to_rgb(char * hex);
 char *rgb_to_hex(COLORREF rgb);
-static void printer_close(zend_rsrc_list_entry *resource TSRMLS_DC);
-static void object_close(zend_rsrc_list_entry *resource TSRMLS_DC);
+static void printer_close(zend_resource *resource);
+static void object_close(zend_resource *resource);
 char *get_default_printer(void);
 
+/* Argument info declarations for PHP 7+ */
+ZEND_BEGIN_ARG_INFO_EX(arginfo_printer_open, 0, 0, 0)
+	ZEND_ARG_INFO(0, printername)
+ZEND_END_ARG_INFO()
+
+ZEND_BEGIN_ARG_INFO_EX(arginfo_printer_close, 0, 0, 1)
+	ZEND_ARG_INFO(0, handle)
+ZEND_END_ARG_INFO()
+
+ZEND_BEGIN_ARG_INFO_EX(arginfo_printer_write, 0, 0, 2)
+	ZEND_ARG_INFO(0, handle)
+	ZEND_ARG_INFO(0, content)
+ZEND_END_ARG_INFO()
+
+ZEND_BEGIN_ARG_INFO_EX(arginfo_printer_list, 0, 0, 1)
+	ZEND_ARG_INFO(0, enumtype)
+	ZEND_ARG_INFO(0, name)
+	ZEND_ARG_INFO(0, level)
+ZEND_END_ARG_INFO()
+
+ZEND_BEGIN_ARG_INFO_EX(arginfo_printer_set_option, 0, 0, 3)
+	ZEND_ARG_INFO(0, handle)
+	ZEND_ARG_INFO(0, option)
+	ZEND_ARG_INFO(0, value)
+ZEND_END_ARG_INFO()
+
+ZEND_BEGIN_ARG_INFO_EX(arginfo_printer_get_option, 0, 0, 2)
+	ZEND_ARG_INFO(0, handle)
+	ZEND_ARG_INFO(0, option)
+ZEND_END_ARG_INFO()
+
+ZEND_BEGIN_ARG_INFO_EX(arginfo_printer_create_dc, 0, 0, 1)
+	ZEND_ARG_INFO(0, handle)
+ZEND_END_ARG_INFO()
+
+ZEND_BEGIN_ARG_INFO_EX(arginfo_printer_delete_dc, 0, 0, 1)
+	ZEND_ARG_INFO(0, handle)
+ZEND_END_ARG_INFO()
+
+ZEND_BEGIN_ARG_INFO_EX(arginfo_printer_start_doc, 0, 0, 1)
+	ZEND_ARG_INFO(0, handle)
+	ZEND_ARG_INFO(0, document)
+ZEND_END_ARG_INFO()
+
+ZEND_BEGIN_ARG_INFO_EX(arginfo_printer_end_doc, 0, 0, 1)
+	ZEND_ARG_INFO(0, handle)
+ZEND_END_ARG_INFO()
+
+ZEND_BEGIN_ARG_INFO_EX(arginfo_printer_start_page, 0, 0, 1)
+	ZEND_ARG_INFO(0, handle)
+ZEND_END_ARG_INFO()
+
+ZEND_BEGIN_ARG_INFO_EX(arginfo_printer_end_page, 0, 0, 1)
+	ZEND_ARG_INFO(0, handle)
+ZEND_END_ARG_INFO()
+
+ZEND_BEGIN_ARG_INFO_EX(arginfo_printer_create_pen, 0, 0, 3)
+	ZEND_ARG_INFO(0, style)
+	ZEND_ARG_INFO(0, width)
+	ZEND_ARG_INFO(0, color)
+ZEND_END_ARG_INFO()
+
+ZEND_BEGIN_ARG_INFO_EX(arginfo_printer_delete_pen, 0, 0, 1)
+	ZEND_ARG_INFO(0, pen)
+ZEND_END_ARG_INFO()
+
+ZEND_BEGIN_ARG_INFO_EX(arginfo_printer_select_pen, 0, 0, 2)
+	ZEND_ARG_INFO(0, handle)
+	ZEND_ARG_INFO(0, pen)
+ZEND_END_ARG_INFO()
+
+ZEND_BEGIN_ARG_INFO_EX(arginfo_printer_create_brush, 0, 0, 2)
+	ZEND_ARG_INFO(0, style)
+	ZEND_ARG_INFO(0, color_or_file)
+ZEND_END_ARG_INFO()
+
+ZEND_BEGIN_ARG_INFO_EX(arginfo_printer_delete_brush, 0, 0, 1)
+	ZEND_ARG_INFO(0, brush)
+ZEND_END_ARG_INFO()
+
+ZEND_BEGIN_ARG_INFO_EX(arginfo_printer_select_brush, 0, 0, 2)
+	ZEND_ARG_INFO(0, handle)
+	ZEND_ARG_INFO(0, brush)
+ZEND_END_ARG_INFO()
+
+ZEND_BEGIN_ARG_INFO_EX(arginfo_printer_create_font, 0, 0, 8)
+	ZEND_ARG_INFO(0, face)
+	ZEND_ARG_INFO(0, height)
+	ZEND_ARG_INFO(0, width)
+	ZEND_ARG_INFO(0, font_weight)
+	ZEND_ARG_INFO(0, italic)
+	ZEND_ARG_INFO(0, underline)
+	ZEND_ARG_INFO(0, strikeout)
+	ZEND_ARG_INFO(0, orientation)
+ZEND_END_ARG_INFO()
+
+ZEND_BEGIN_ARG_INFO_EX(arginfo_printer_delete_font, 0, 0, 1)
+	ZEND_ARG_INFO(0, font)
+ZEND_END_ARG_INFO()
+
+ZEND_BEGIN_ARG_INFO_EX(arginfo_printer_select_font, 0, 0, 2)
+	ZEND_ARG_INFO(0, handle)
+	ZEND_ARG_INFO(0, font)
+ZEND_END_ARG_INFO()
+
+ZEND_BEGIN_ARG_INFO_EX(arginfo_printer_logical_fontheight, 0, 0, 2)
+	ZEND_ARG_INFO(0, handle)
+	ZEND_ARG_INFO(0, height)
+ZEND_END_ARG_INFO()
+
+ZEND_BEGIN_ARG_INFO_EX(arginfo_printer_draw_roundrect, 0, 0, 7)
+	ZEND_ARG_INFO(0, handle)
+	ZEND_ARG_INFO(0, ul_x)
+	ZEND_ARG_INFO(0, ul_y)
+	ZEND_ARG_INFO(0, lr_x)
+	ZEND_ARG_INFO(0, lr_y)
+	ZEND_ARG_INFO(0, width)
+	ZEND_ARG_INFO(0, height)
+ZEND_END_ARG_INFO()
+
+ZEND_BEGIN_ARG_INFO_EX(arginfo_printer_draw_rectangle, 0, 0, 5)
+	ZEND_ARG_INFO(0, handle)
+	ZEND_ARG_INFO(0, ul_x)
+	ZEND_ARG_INFO(0, ul_y)
+	ZEND_ARG_INFO(0, lr_x)
+	ZEND_ARG_INFO(0, lr_y)
+ZEND_END_ARG_INFO()
+
+ZEND_BEGIN_ARG_INFO_EX(arginfo_printer_draw_text, 0, 0, 4)
+	ZEND_ARG_INFO(0, handle)
+	ZEND_ARG_INFO(0, text)
+	ZEND_ARG_INFO(0, x)
+	ZEND_ARG_INFO(0, y)
+ZEND_END_ARG_INFO()
+
+ZEND_BEGIN_ARG_INFO_EX(arginfo_printer_draw_elipse, 0, 0, 5)
+	ZEND_ARG_INFO(0, handle)
+	ZEND_ARG_INFO(0, ul_x)
+	ZEND_ARG_INFO(0, ul_y)
+	ZEND_ARG_INFO(0, lr_x)
+	ZEND_ARG_INFO(0, lr_y)
+ZEND_END_ARG_INFO()
+
+ZEND_BEGIN_ARG_INFO_EX(arginfo_printer_draw_line, 0, 0, 5)
+	ZEND_ARG_INFO(0, handle)
+	ZEND_ARG_INFO(0, fx)
+	ZEND_ARG_INFO(0, fy)
+	ZEND_ARG_INFO(0, tx)
+	ZEND_ARG_INFO(0, ty)
+ZEND_END_ARG_INFO()
+
+ZEND_BEGIN_ARG_INFO_EX(arginfo_printer_draw_chord, 0, 0, 9)
+	ZEND_ARG_INFO(0, handle)
+	ZEND_ARG_INFO(0, rec_x)
+	ZEND_ARG_INFO(0, rec_y)
+	ZEND_ARG_INFO(0, rec_x1)
+	ZEND_ARG_INFO(0, rec_y1)
+	ZEND_ARG_INFO(0, rad_x)
+	ZEND_ARG_INFO(0, rad_y)
+	ZEND_ARG_INFO(0, rad_x1)
+	ZEND_ARG_INFO(0, rad_y1)
+ZEND_END_ARG_INFO()
+
+ZEND_BEGIN_ARG_INFO_EX(arginfo_printer_draw_pie, 0, 0, 9)
+	ZEND_ARG_INFO(0, handle)
+	ZEND_ARG_INFO(0, rec_x)
+	ZEND_ARG_INFO(0, rec_y)
+	ZEND_ARG_INFO(0, rec_x1)
+	ZEND_ARG_INFO(0, rec_y1)
+	ZEND_ARG_INFO(0, rad1_x)
+	ZEND_ARG_INFO(0, rad1_y)
+	ZEND_ARG_INFO(0, rad2_x)
+	ZEND_ARG_INFO(0, rad2_y)
+ZEND_END_ARG_INFO()
+
+ZEND_BEGIN_ARG_INFO_EX(arginfo_printer_draw_bmp, 0, 0, 4)
+	ZEND_ARG_INFO(0, handle)
+	ZEND_ARG_INFO(0, filename)
+	ZEND_ARG_INFO(0, x)
+	ZEND_ARG_INFO(0, y)
+	ZEND_ARG_INFO(0, width)
+	ZEND_ARG_INFO(0, height)
+ZEND_END_ARG_INFO()
+
+ZEND_BEGIN_ARG_INFO_EX(arginfo_printer_abort, 0, 0, 1)
+	ZEND_ARG_INFO(0, handle)
+ZEND_END_ARG_INFO()
+
 zend_function_entry printer_functions[] = {
-	PHP_FE(printer_open,				NULL)
-	PHP_FE(printer_close,				NULL)
-	PHP_FE(printer_write,				NULL)
-	PHP_FE(printer_list,				NULL)
-	PHP_FE(printer_set_option,			NULL)
-	PHP_FE(printer_get_option,			NULL)
-	PHP_FE(printer_create_dc,			NULL)
-	PHP_FE(printer_delete_dc,			NULL)
-	PHP_FE(printer_start_doc,			NULL)
-	PHP_FE(printer_end_doc,				NULL)
-	PHP_FE(printer_start_page,			NULL)
-	PHP_FE(printer_end_page,			NULL)
-	PHP_FE(printer_create_pen,			NULL)
-	PHP_FE(printer_delete_pen,			NULL)
-	PHP_FE(printer_select_pen,			NULL)
-	PHP_FE(printer_create_brush,		NULL)
-	PHP_FE(printer_delete_brush,		NULL)
-	PHP_FE(printer_select_brush,		NULL)
-	PHP_FE(printer_create_font,			NULL)
-	PHP_FE(printer_delete_font,			NULL)
-	PHP_FE(printer_select_font,			NULL)
-	PHP_FE(printer_logical_fontheight,	NULL)
-	PHP_FE(printer_draw_roundrect,		NULL)
-	PHP_FE(printer_draw_rectangle,		NULL)
-	PHP_FE(printer_draw_text,			NULL)
-	PHP_FE(printer_draw_elipse,			NULL)
-	PHP_FE(printer_draw_line,			NULL)
-	PHP_FE(printer_draw_chord,			NULL)
-	PHP_FE(printer_draw_pie,			NULL)
-	PHP_FE(printer_draw_bmp,			NULL)
-	PHP_FE(printer_abort,				NULL)
-	{NULL, NULL, NULL}
+	PHP_FE(printer_open,				arginfo_printer_open)
+	PHP_FE(printer_close,				arginfo_printer_close)
+	PHP_FE(printer_write,				arginfo_printer_write)
+	PHP_FE(printer_list,				arginfo_printer_list)
+	PHP_FE(printer_set_option,			arginfo_printer_set_option)
+	PHP_FE(printer_get_option,			arginfo_printer_get_option)
+	PHP_FE(printer_create_dc,			arginfo_printer_create_dc)
+	PHP_FE(printer_delete_dc,			arginfo_printer_delete_dc)
+	PHP_FE(printer_start_doc,			arginfo_printer_start_doc)
+	PHP_FE(printer_end_doc,				arginfo_printer_end_doc)
+	PHP_FE(printer_start_page,			arginfo_printer_start_page)
+	PHP_FE(printer_end_page,			arginfo_printer_end_page)
+	PHP_FE(printer_create_pen,			arginfo_printer_create_pen)
+	PHP_FE(printer_delete_pen,			arginfo_printer_delete_pen)
+	PHP_FE(printer_select_pen,			arginfo_printer_select_pen)
+	PHP_FE(printer_create_brush,		arginfo_printer_create_brush)
+	PHP_FE(printer_delete_brush,		arginfo_printer_delete_brush)
+	PHP_FE(printer_select_brush,		arginfo_printer_select_brush)
+	PHP_FE(printer_create_font,			arginfo_printer_create_font)
+	PHP_FE(printer_delete_font,			arginfo_printer_delete_font)
+	PHP_FE(printer_select_font,			arginfo_printer_select_font)
+	PHP_FE(printer_logical_fontheight,	arginfo_printer_logical_fontheight)
+	PHP_FE(printer_draw_roundrect,		arginfo_printer_draw_roundrect)
+	PHP_FE(printer_draw_rectangle,		arginfo_printer_draw_rectangle)
+	PHP_FE(printer_draw_text,			arginfo_printer_draw_text)
+	PHP_FE(printer_draw_elipse,			arginfo_printer_draw_elipse)
+	PHP_FE(printer_draw_line,			arginfo_printer_draw_line)
+	PHP_FE(printer_draw_chord,			arginfo_printer_draw_chord)
+	PHP_FE(printer_draw_pie,			arginfo_printer_draw_pie)
+	PHP_FE(printer_draw_bmp,			arginfo_printer_draw_bmp)
+	PHP_FE(printer_abort,				arginfo_printer_abort)
+	PHP_FE_END
 };
 
 zend_module_entry printer_module_entry = {
@@ -117,11 +305,11 @@ PHP_MINFO_FUNCTION(printer)
 
 static PHP_INI_MH(OnUpdatePrinter)
 {
-	if (new_value != NULL && new_value_length > 0) {
+	if (new_value != NULL && ZSTR_LEN(new_value) > 0) {
 		if (PRINTERG(default_printer)) {
 			pefree(PRINTERG(default_printer), 1);
 		}
-		PRINTERG(default_printer) = pestrdup(new_value, 1);
+		PRINTERG(default_printer) = pestrdup(ZSTR_VAL(new_value), 1);
 	}
 	return SUCCESS;
 }
@@ -152,11 +340,11 @@ PHP_INI_END()
 
 #define REGP_CONSTANT(a,b)	REGISTER_LONG_CONSTANT(a, b, CONST_CS | CONST_PERSISTENT);
 
-static void php_printer_init(zend_printer_globals *printer_globals TSRMLS_DC) {
+static void php_printer_init(zend_printer_globals *printer_globals) {
 	printer_globals->default_printer = get_default_printer();
 }
 
-static void php_printer_shutdown(zend_printer_globals *printer_globals TSRMLS_DC) {
+static void php_printer_shutdown(zend_printer_globals *printer_globals) {
 	if (printer_globals->default_printer) {
 		pefree(printer_globals->default_printer, 1);
 	}
@@ -251,7 +439,7 @@ PHP_MSHUTDOWN_FUNCTION(printer)
 #ifdef ZTS
 	ts_free_id(printer_globals_id);
 #else
-	php_printer_shutdown(&printer_globals TSRMLS_CC);
+	php_printer_shutdown(&printer_globals);
 #endif
 	UNREGISTER_INI_ENTRIES();
 	return SUCCESS;
@@ -263,23 +451,22 @@ PHP_MSHUTDOWN_FUNCTION(printer)
    Return a handle to the printer or false if connection failed */
 PHP_FUNCTION(printer_open)
 {
-	zval **arg1;
+	char *printername = NULL;
+	size_t printername_len = 0;
 	printer *resource;
 
-	int argc = ZEND_NUM_ARGS();
+	if (zend_parse_parameters(ZEND_NUM_ARGS(), "|s", &printername, &printername_len) == FAILURE) {
+		RETURN_THROWS();
+	}
 
 	resource = (printer *)emalloc(sizeof(printer));
 	resource->dmModifiedFields = 0;
 
-	if( argc == 1 && zend_get_parameters_ex(1, &arg1) != FAILURE ) {
-      	convert_to_string_ex(arg1);
-      	resource->name = Z_STRVAL_PP(arg1);
-	}
-	else if( argc == 0 ) {
-		resource->name = PRINTERG(default_printer);
+	if (printername != NULL) {
+		resource->name = printername;
 	}
 	else {
-		WRONG_PARAM_COUNT;
+		resource->name = PRINTERG(default_printer);
 	}
 
 	if (OpenPrinter(resource->name, &resource->handle, NULL) != 0) {
@@ -292,11 +479,11 @@ PHP_FUNCTION(printer_open)
 			resource->info.fwType		= 0;
 			resource->info.cbSize		= sizeof(resource->info);
 			resource->dc = CreateDC(NULL, resource->name, NULL, resource->pi2->pDevMode);
-			ZEND_REGISTER_RESOURCE(return_value, resource, le_printer);
+			RETURN_RES(zend_register_resource(resource, le_printer));
 		}
 	}
 	else {
-		php_error_docref(NULL TSRMLS_CC, E_WARNING, "couldn't connect to the printer [%s]", resource->name);
+		php_error_docref(NULL, E_WARNING, "couldn't connect to the printer [%s]", resource->name);
 		RETURN_FALSE;
 	}
 }
@@ -307,16 +494,18 @@ PHP_FUNCTION(printer_open)
    Close the printer connection */
 PHP_FUNCTION(printer_close)
 {
-	zval **arg1;
+	zval *zres;
 	printer *resource;
 
-	if ( zend_get_parameters_ex(1, &arg1) == FAILURE ) {
-		WRONG_PARAM_COUNT;
+	if (zend_parse_parameters(ZEND_NUM_ARGS(), "r", &zres) == FAILURE) {
+		RETURN_THROWS();
 	}
 
-	ZEND_FETCH_RESOURCE(resource, printer *, arg1, -1, "Printer Handle", le_printer);
+	if ((resource = (printer *)zend_fetch_resource(Z_RES_P(zres), "Printer Handle", le_printer)) == NULL) {
+		RETURN_THROWS();
+	}
 
-	zend_list_delete(Z_RESVAL_PP(arg1));
+	zend_list_close(Z_RES_P(zres));
 }
 /* }}} */
 
@@ -325,18 +514,20 @@ PHP_FUNCTION(printer_close)
    Write directly to the printer */
 PHP_FUNCTION(printer_write)
 {
-	zval **arg1, **arg2;
+	zval *zres;
+	char *content;
+	size_t content_len;
 	printer *resource;
 	DOC_INFO_1 docinfo;
-	int sd, sp = 0, recieved;
+	int sd, sp = 0, received;
 
-	if ( zend_get_parameters_ex(2, &arg1, &arg2) == FAILURE ) {
-		WRONG_PARAM_COUNT;
+	if (zend_parse_parameters(ZEND_NUM_ARGS(), "rs", &zres, &content, &content_len) == FAILURE) {
+		RETURN_THROWS();
 	}
 
-
-	ZEND_FETCH_RESOURCE(resource, printer *, arg1, -1, "Printer Handle", le_printer);
-	convert_to_string_ex(arg2);
+	if ((resource = (printer *)zend_fetch_resource(Z_RES_P(zres), "Printer Handle", le_printer)) == NULL) {
+		RETURN_THROWS();
+	}
 
 	docinfo.pDocName	= (LPTSTR)resource->info.lpszDocName;
 	docinfo.pOutputFile	= (LPTSTR)resource->info.lpszOutput;
@@ -346,13 +537,13 @@ PHP_FUNCTION(printer_write)
 	sp = StartPagePrinter(resource->handle);
 
 	if( sd && sp ) {
-		WritePrinter(resource->handle, Z_STRVAL_PP(arg2), Z_STRLEN_PP(arg2), &recieved);
+		WritePrinter(resource->handle, content, content_len, &received);
 		EndPagePrinter(resource->handle);
 		EndDocPrinter(resource->handle);
 		RETURN_TRUE;
 	}
 	else {
-		php_error_docref(NULL TSRMLS_CC, E_WARNING, "couldn't allocate the printerjob [%d]", GetLastError());
+		php_error_docref(NULL, E_WARNING, "couldn't allocate the printerjob [%d]", GetLastError());
 		RETURN_FALSE;
 	}
 }
@@ -363,47 +554,30 @@ PHP_FUNCTION(printer_write)
    Return an array of printers attached to the server */
 PHP_FUNCTION(printer_list)
 {
-	zval *Printer, *Printer_ptr, **arg1, **arg2, **arg3;
-	char InfoBuffer[8192], *Name;
+	zval Printer;
+	char InfoBuffer[8192], *Name = NULL;
+	size_t Name_len = 0;
+	zend_long enumtype, Level = 1;
 
 	PRINTER_INFO_1 *P1;
 	PRINTER_INFO_2 *P2;
 	PRINTER_INFO_4 *P4;
 	PRINTER_INFO_5 *P5;
 	DWORD bNeeded = sizeof(InfoBuffer), cReturned, i;
-	int argc = ZEND_NUM_ARGS(), Level;
 	int LevvelsAllowed[] = {0, 1, 1, 0, 1, 1};
 
-	if( argc < 1 || argc > 3 || zend_get_parameters_ex(argc, &arg1, &arg2, &arg3) == FAILURE) {
-		WRONG_PARAM_COUNT;
+	if (zend_parse_parameters(ZEND_NUM_ARGS(), "l|sl", &enumtype, &Name, &Name_len, &Level) == FAILURE) {
+		RETURN_THROWS();
 	}
 
-	Level = 1;
-	Name = NULL;
-
-	switch(argc) {
-		case 3:
-			convert_to_long_ex(arg3);
-			Level = (int)Z_LVAL_PP(arg3);
-			if(!LevvelsAllowed[Level]) {
-				php_error_docref(NULL TSRMLS_CC, E_WARNING, "Level not allowed");
-				RETURN_FALSE;
-			}
-		case 2:
-			convert_to_string_ex(arg2);
-			Name = Z_STRVAL_PP(arg2);
-		case 1:
-			convert_to_long_ex(arg1);
-			break;
-	}
-
-	
-	if(array_init(return_value) == FAILURE) {
+	if(!LevvelsAllowed[Level]) {
+		php_error_docref(NULL, E_WARNING, "Level not allowed");
 		RETURN_FALSE;
 	}
+	
+	array_init(return_value);
 
-
-	EnumPrinters(Z_LVAL_PP(arg1), Name, Level, (LPBYTE)InfoBuffer, sizeof(InfoBuffer), &bNeeded, &cReturned);
+	EnumPrinters(enumtype, Name, Level, (LPBYTE)InfoBuffer, sizeof(InfoBuffer), &bNeeded, &cReturned);
 
 	P1 = (PRINTER_INFO_1 *)InfoBuffer;
 	P2 = (PRINTER_INFO_2 *)InfoBuffer;
@@ -412,58 +586,57 @@ PHP_FUNCTION(printer_list)
 
 
 	for(i = 0; i < cReturned; i++) {
-		Printer = (zval *) emalloc(sizeof(zval));
-		array_init(Printer);
+		array_init(&Printer);
 		
 		switch (Level) {
 			case 1:
-				add_assoc_string(Printer, "NAME", P1->pName, 1);
-				add_assoc_string(Printer, "DESCRIPTION", P1->pDescription, 1);
-				add_assoc_string(Printer, "COMMENT", P1->pComment, 1);
+				add_assoc_string(&Printer, "NAME", P1->pName);
+				add_assoc_string(&Printer, "DESCRIPTION", P1->pDescription);
+				add_assoc_string(&Printer, "COMMENT", P1->pComment);
 				P1++;
 				break;
 
 			case 2:
-				if (P2->pServerName) add_assoc_string(Printer, "SERVERNAME", P2->pServerName, 1);
-				if (P2->pPrinterName) add_assoc_string(Printer, "PRINTERNAME", P2->pPrinterName, 1);
-				if (P2->pShareName) add_assoc_string(Printer, "SHARENAME", P2->pShareName, 1);
-				if (P2->pPortName) add_assoc_string(Printer, "PORTNAME", P2->pPortName, 1);
-				if (P2->pDriverName) add_assoc_string(Printer, "DRIVERNAME", P2->pDriverName, 1);
-				if (P2->pComment) add_assoc_string(Printer, "COMMENT", P2->pComment, 1);
-				if (P2->pLocation) add_assoc_string(Printer, "LOCATION", P2->pLocation, 1);
-				if (P2->pSepFile) add_assoc_string(Printer, "SEPFILE", P2->pSepFile, 1);
-				if (P2->pPrintProcessor) add_assoc_string(Printer, "PRINTPROCESSOR", P2->pPrintProcessor, 1);
-				if (P2->pDatatype) add_assoc_string(Printer, "DATATYPE", P2->pDatatype, 1);
-				if (P2->pParameters) add_assoc_string(Printer, "PARAMETRES", P2->pParameters, 1);
-				add_assoc_long(Printer, "ATTRIBUTES", P2->Attributes);
-				add_assoc_long(Printer, "PRIORITY", P2->Priority);
-				add_assoc_long(Printer, "DEFAULTPRIORITY", P2->DefaultPriority);
-				add_assoc_long(Printer, "STARTTIME", P2->StartTime);
-				add_assoc_long(Printer, "UNTILTIME", P2->UntilTime);
-				add_assoc_long(Printer, "STATUS", P2->Status);
-				add_assoc_long(Printer, "CJOBS", P2->cJobs);
-				add_assoc_long(Printer, "AVERAGEPPM", P2->AveragePPM);
+				if (P2->pServerName) add_assoc_string(&Printer, "SERVERNAME", P2->pServerName);
+				if (P2->pPrinterName) add_assoc_string(&Printer, "PRINTERNAME", P2->pPrinterName);
+				if (P2->pShareName) add_assoc_string(&Printer, "SHARENAME", P2->pShareName);
+				if (P2->pPortName) add_assoc_string(&Printer, "PORTNAME", P2->pPortName);
+				if (P2->pDriverName) add_assoc_string(&Printer, "DRIVERNAME", P2->pDriverName);
+				if (P2->pComment) add_assoc_string(&Printer, "COMMENT", P2->pComment);
+				if (P2->pLocation) add_assoc_string(&Printer, "LOCATION", P2->pLocation);
+				if (P2->pSepFile) add_assoc_string(&Printer, "SEPFILE", P2->pSepFile);
+				if (P2->pPrintProcessor) add_assoc_string(&Printer, "PRINTPROCESSOR", P2->pPrintProcessor);
+				if (P2->pDatatype) add_assoc_string(&Printer, "DATATYPE", P2->pDatatype);
+				if (P2->pParameters) add_assoc_string(&Printer, "PARAMETRES", P2->pParameters);
+				add_assoc_long(&Printer, "ATTRIBUTES", P2->Attributes);
+				add_assoc_long(&Printer, "PRIORITY", P2->Priority);
+				add_assoc_long(&Printer, "DEFAULTPRIORITY", P2->DefaultPriority);
+				add_assoc_long(&Printer, "STARTTIME", P2->StartTime);
+				add_assoc_long(&Printer, "UNTILTIME", P2->UntilTime);
+				add_assoc_long(&Printer, "STATUS", P2->Status);
+				add_assoc_long(&Printer, "CJOBS", P2->cJobs);
+				add_assoc_long(&Printer, "AVERAGEPPM", P2->AveragePPM);
 				P2++;
 				break;
 
 			case 4:
-				add_assoc_string(Printer, "PRINTERNAME", P4->pPrinterName, 1);
-				add_assoc_string(Printer, "SERVERNAME", P4->pServerName, 1);
-				add_assoc_long(Printer, "ATTRIBUTES", P4->Attributes);
+				add_assoc_string(&Printer, "PRINTERNAME", P4->pPrinterName);
+				add_assoc_string(&Printer, "SERVERNAME", P4->pServerName);
+				add_assoc_long(&Printer, "ATTRIBUTES", P4->Attributes);
 				P4++;
 				break;
 
 			case 5:
-				add_assoc_string(Printer, "PRINTERNAME", P5->pPrinterName, 1);
-				add_assoc_string(Printer, "PORTNAME", P5->pPortName, 1);
-				add_assoc_long(Printer, "ATTRIBUTES", P5->Attributes);
-				add_assoc_long(Printer, "DEVICENOTSELECTEDTIMEOUT", P5->DeviceNotSelectedTimeout);
-				add_assoc_long(Printer, "TRANSMISSIONRETRYTIMEOUT", P5->TransmissionRetryTimeout);
+				add_assoc_string(&Printer, "PRINTERNAME", P5->pPrinterName);
+				add_assoc_string(&Printer, "PORTNAME", P5->pPortName);
+				add_assoc_long(&Printer, "ATTRIBUTES", P5->Attributes);
+				add_assoc_long(&Printer, "DEVICENOTSELECTEDTIMEOUT", P5->DeviceNotSelectedTimeout);
+				add_assoc_long(&Printer, "TRANSMISSIONRETRYTIMEOUT", P5->TransmissionRetryTimeout);
 				P5++;
 				break;
 		}
 
-		zend_hash_index_update(Z_ARRVAL_P(return_value), i, (void *) &Printer, sizeof(zval *), (void **) &Printer_ptr);
+		add_index_zval(return_value, i, &Printer);
 	}
 }
 
@@ -476,109 +649,111 @@ PHP_FUNCTION(printer_set_option)
 {
 	DWORD dwNeeded =0;
 	PRINTER_DEFAULTS pd;
-	zval **arg1, **arg2, **arg3;
+	zval *zres, *value;
+	zend_long option;
 	printer *resource;
 
-	if( zend_get_parameters_ex(3, &arg1, &arg2, &arg3) == FAILURE ) {
-		WRONG_PARAM_COUNT;
+	if (zend_parse_parameters(ZEND_NUM_ARGS(), "rlz", &zres, &option, &value) == FAILURE) {
+		RETURN_THROWS();
 	}
 
-	ZEND_FETCH_RESOURCE(resource, printer *, arg1, -1, "Printer Handle", le_printer);
-	convert_to_long_ex(arg2);
+	if ((resource = (printer *)zend_fetch_resource(Z_RES_P(zres), "Printer Handle", le_printer)) == NULL) {
+		RETURN_THROWS();
+	}
 
 	memset(&pd,0,sizeof(pd));
 	pd.DesiredAccess = PRINTER_ALL_ACCESS;
 	SetLastError(0);
 
-	switch(Z_LVAL_PP(arg2)) {
+	switch(option) {
 		case COPIES:
-			convert_to_long_ex(arg3);
-			resource->pi2->pDevMode->dmCopies=(short)Z_LVAL_PP(arg3);
+			convert_to_long(value);
+			resource->pi2->pDevMode->dmCopies=(short)Z_LVAL_P(value);
 			resource->dmModifiedFields|=DM_COPIES;
 			break;
 
 		case MODE:
-			convert_to_string_ex(arg3);
+			convert_to_string(value);
 			if (resource->info.lpszDatatype) {
 				efree((char *)resource->info.lpszDatatype);
 			}
-			resource->info.lpszDatatype		= estrdup(Z_STRVAL_PP(arg3));
+			resource->info.lpszDatatype		= estrdup(Z_STRVAL_P(value));
 			resource->info.cbSize			= sizeof(resource->info);
 			break;
 
 		case TITLE:
-			convert_to_string_ex(arg3);
+			convert_to_string(value);
 			if (resource->info.lpszDocName) {
 				efree((char *)resource->info.lpszDocName);
 			}
-			resource->info.lpszDocName		= estrdup(Z_STRVAL_PP(arg3));
+			resource->info.lpszDocName		= estrdup(Z_STRVAL_P(value));
 			resource->info.cbSize			= sizeof(resource->info);
 			break;
 
 		case OUTPUT_FILE:
-			convert_to_string_ex(arg3);
+			convert_to_string(value);
 			if (resource->info.lpszOutput) {
 				efree((char *)resource->info.lpszOutput);
 			}
-			resource->info.lpszOutput		= estrdup(Z_STRVAL_PP(arg3));
+			resource->info.lpszOutput		= estrdup(Z_STRVAL_P(value));
 			resource->info.cbSize			= sizeof(resource->info);
 			break;
 
 		case ORIENTATION:
-			convert_to_long_ex(arg3);
-			resource->pi2->pDevMode->dmOrientation=(short)Z_LVAL_PP(arg3);
+			convert_to_long(value);
+			resource->pi2->pDevMode->dmOrientation=(short)Z_LVAL_P(value);
 			resource->dmModifiedFields|=DM_ORIENTATION;
 			break;
 
 		case YRESOLUTION:
-			convert_to_long_ex(arg3);
-			resource->pi2->pDevMode->dmYResolution = (short)Z_LVAL_PP(arg3);
+			convert_to_long(value);
+			resource->pi2->pDevMode->dmYResolution = (short)Z_LVAL_P(value);
 			resource->dmModifiedFields|=DM_YRESOLUTION;
 			break;
 		
 		case XRESOLUTION:
-			convert_to_long_ex(arg3);
-			resource->pi2->pDevMode->dmPrintQuality= (short)Z_LVAL_PP(arg3);
+			convert_to_long(value);
+			resource->pi2->pDevMode->dmPrintQuality= (short)Z_LVAL_P(value);
 			resource->dmModifiedFields|=DM_PRINTQUALITY;
 			break;
 
 		case PAPER_FORMAT:
-			convert_to_long_ex(arg3);
-			resource->pi2->pDevMode->dmPaperSize	= (short)Z_LVAL_PP(arg3);
+			convert_to_long(value);
+			resource->pi2->pDevMode->dmPaperSize	= (short)Z_LVAL_P(value);
 			resource->dmModifiedFields|=DM_PAPERSIZE;
 			break;
 
 		case PAPER_LENGTH:
-			convert_to_long_ex(arg3);
-			resource->pi2->pDevMode->dmPaperLength = (short)(Z_LVAL_PP(arg3) * 10);
+			convert_to_long(value);
+			resource->pi2->pDevMode->dmPaperLength = (short)(Z_LVAL_P(value) * 10);
 			resource->dmModifiedFields|=DM_PAPERLENGTH;
 			break;
 
 		case PAPER_WIDTH:
-			convert_to_long_ex(arg3);
-			resource->pi2->pDevMode->dmPaperWidth	= (short)(Z_LVAL_PP(arg3) * 10);
+			convert_to_long(value);
+			resource->pi2->pDevMode->dmPaperWidth	= (short)(Z_LVAL_P(value) * 10);
 			resource->dmModifiedFields |=  DM_PAPERWIDTH;
 			break;
 
 		case SCALE:
-			convert_to_long_ex(arg3);
-			resource->pi2->pDevMode->dmScale		= (short)Z_LVAL_PP(arg3);
+			convert_to_long(value);
+			resource->pi2->pDevMode->dmScale		= (short)Z_LVAL_P(value);
 			resource->dmModifiedFields |= DM_SCALE;
 			break;
 
 		case BG_COLOR:
-			convert_to_string_ex(arg3);
-			SetBkColor(resource->dc, hex_to_rgb(Z_STRVAL_PP(arg3)));
+			convert_to_string(value);
+			SetBkColor(resource->dc, hex_to_rgb(Z_STRVAL_P(value)));
 			break;
 
 		case TEXT_COLOR:
-			convert_to_string_ex(arg3);
-			SetTextColor(resource->dc, hex_to_rgb(Z_STRVAL_PP(arg3)));
+			convert_to_string(value);
+			SetTextColor(resource->dc, hex_to_rgb(Z_STRVAL_P(value)));
 			break;
 
 		case TEXT_ALIGN:
-			convert_to_string_ex(arg3);
-			SetTextAlign(resource->dc, Z_LVAL_PP(arg3));
+			convert_to_long(value);
+			SetTextAlign(resource->dc, Z_LVAL_P(value));
 			break;
 		case VALID_OPTIONS:
 			resource->pi2->pSecurityDescriptor=NULL;
@@ -589,7 +764,7 @@ PHP_FUNCTION(printer_set_option)
 			SendMessageTimeout(HWND_BROADCAST,WM_DEVMODECHANGE,0L,(LPARAM)(LPCSTR)resource->name,SMTO_NORMAL,1000,NULL);
 		break;
 		default:
-			php_error_docref(NULL TSRMLS_CC, E_WARNING, "unknown option passed to printer_set_option()");
+			php_error_docref(NULL, E_WARNING, "unknown option passed to printer_set_option()");
 			RETURN_FALSE;
 	}
 
@@ -603,29 +778,31 @@ PHP_FUNCTION(printer_set_option)
    Get configured data */
 PHP_FUNCTION(printer_get_option)
 {
-	zval **arg1, **arg2;
+	zval *zres;
+	zend_long option;
 	printer *resource;
 
-	if( zend_get_parameters_ex(2, &arg1, &arg2) == FAILURE ) {
-		WRONG_PARAM_COUNT;
+	if (zend_parse_parameters(ZEND_NUM_ARGS(), "rl", &zres, &option) == FAILURE) {
+		RETURN_THROWS();
 	}
 
-	ZEND_FETCH_RESOURCE(resource, printer *, arg1, -1, "Printer Handle", le_printer);
-	convert_to_long_ex(arg2);
+	if ((resource = (printer *)zend_fetch_resource(Z_RES_P(zres), "Printer Handle", le_printer)) == NULL) {
+		RETURN_THROWS();
+	}
 
-	switch(Z_LVAL_PP(arg2)) {
+	switch(option) {
 		case COPIES:
 			RETURN_LONG(resource->pi2->pDevMode->dmCopies);
 
 		case MODE:
-			RETURN_STRING((char*)resource->info.lpszDatatype,1);
+			RETURN_STRING((char*)resource->info.lpszDatatype);
 
 		case TITLE:
-			RETURN_STRING((char*)resource->info.lpszDocName,1);
+			RETURN_STRING((char*)resource->info.lpszDocName);
 
 		case OUTPUT_FILE:
 			if (resource->info.lpszOutput) {
-				RETURN_STRING((char*)resource->info.lpszOutput,1);
+				RETURN_STRING((char*)resource->info.lpszOutput);
 			}
 			else {
 				RETURN_NULL();
@@ -653,22 +830,22 @@ PHP_FUNCTION(printer_get_option)
 			RETURN_LONG(resource->pi2->pDevMode->dmScale);
 
 		case BG_COLOR:
-			RETURN_STRING(rgb_to_hex(GetBkColor(resource->dc)), 0);
+			RETURN_STRING(rgb_to_hex(GetBkColor(resource->dc)));
 
 		case TEXT_COLOR:
-			RETURN_STRING(rgb_to_hex(GetTextColor(resource->dc)), 0);
+			RETURN_STRING(rgb_to_hex(GetTextColor(resource->dc)));
 
 		case TEXT_ALIGN:
 			RETURN_LONG(GetTextAlign(resource->dc));
 
 		case DEVICENAME:
-			RETURN_STRING(resource->name, 1);
+			RETURN_STRING(resource->name);
 
 		case DRIVER_VERSION:
 			RETURN_LONG(resource->pi2->pDevMode->dmDriverVersion);
 
 		default:
-			php_error_docref(NULL TSRMLS_CC, E_WARNING, "unknown option passed to printer_get_option()");
+			php_error_docref(NULL, E_WARNING, "unknown option passed to printer_get_option()");
 			RETURN_FALSE;
 	}
 }
@@ -679,17 +856,19 @@ PHP_FUNCTION(printer_get_option)
    Create a device content */
 PHP_FUNCTION(printer_create_dc)
 {
-	zval **arg1;
+	zval *zres;
 	printer *resource;
 
-	if( zend_get_parameters_ex(1, &arg1) == FAILURE ) {
-		WRONG_PARAM_COUNT;
+	if (zend_parse_parameters(ZEND_NUM_ARGS(), "r", &zres) == FAILURE) {
+		RETURN_THROWS();
 	}
 
-	ZEND_FETCH_RESOURCE(resource, printer *, arg1, -1, "Printer Handle", le_printer);
+	if ((resource = (printer *)zend_fetch_resource(Z_RES_P(zres), "Printer Handle", le_printer)) == NULL) {
+		RETURN_THROWS();
+	}
 
 	if( resource->dc != NULL ) {
-		php_error_docref(NULL TSRMLS_CC, E_WARNING, "Deleting old DeviceContext");
+		php_error_docref(NULL, E_WARNING, "Deleting old DeviceContext");
 		DeleteDC(resource->dc);
 	}
 	
@@ -702,14 +881,16 @@ PHP_FUNCTION(printer_create_dc)
    Delete a device content */
 PHP_FUNCTION(printer_delete_dc)
 {
-	zval **arg1;
+	zval *zres;
 	printer *resource;
 
-	if( zend_get_parameters_ex(1, &arg1) == FAILURE ) {
-		WRONG_PARAM_COUNT;
+	if (zend_parse_parameters(ZEND_NUM_ARGS(), "r", &zres) == FAILURE) {
+		RETURN_THROWS();
 	}
 
-	ZEND_FETCH_RESOURCE(resource, printer *, arg1, -1, "Printer Handle", le_printer);
+	if ((resource = (printer *)zend_fetch_resource(Z_RES_P(zres), "Printer Handle", le_printer)) == NULL) {
+		RETURN_THROWS();
+	}
 
 	if( resource->dc != NULL ) {
 		DeleteDC(resource->dc);
@@ -717,7 +898,7 @@ PHP_FUNCTION(printer_delete_dc)
 		RETURN_TRUE;
 	}
 	else {
-		php_error_docref(NULL TSRMLS_CC, E_WARNING, "No DeviceContext created");
+		php_error_docref(NULL, E_WARNING, "No DeviceContext created");
 		RETURN_FALSE;
 	}
 }
@@ -728,27 +909,29 @@ PHP_FUNCTION(printer_delete_dc)
    Start a document */
 PHP_FUNCTION(printer_start_doc)
 {
-	zval **parameter[2];
+	zval *zres;
+	char *document = NULL;
+	size_t document_len = 0;
 	printer *resource;
-	int argc = ZEND_NUM_ARGS();
 	
-	if (argc > 2 || argc < 1 || zend_get_parameters_array_ex(argc, parameter) == FAILURE) {
-		WRONG_PARAM_COUNT;
+	if (zend_parse_parameters(ZEND_NUM_ARGS(), "r|s", &zres, &document, &document_len) == FAILURE) {
+		RETURN_THROWS();
 	}
 
-	ZEND_FETCH_RESOURCE(resource, printer *, parameter[0], -1, "Printer Handle", le_printer);
+	if ((resource = (printer *)zend_fetch_resource(Z_RES_P(zres), "Printer Handle", le_printer)) == NULL) {
+		RETURN_THROWS();
+	}
 	
-	if(argc == 2) {
-		convert_to_string_ex(parameter[1]);
+	if(document != NULL) {
 		if (resource->info.lpszDocName) {
 			efree((char *)resource->info.lpszDocName);
 		}
-		resource->info.lpszDocName = estrdup(Z_STRVAL_PP(parameter[1]));
+		resource->info.lpszDocName = estrdup(document);
 		resource->info.cbSize	   = sizeof(resource->info);
 	}
 
 	if(StartDoc(resource->dc, &resource->info) < 0) {
-		php_error_docref(NULL TSRMLS_CC, E_WARNING, "couldn't allocate new print job");
+		php_error_docref(NULL, E_WARNING, "couldn't allocate new print job");
 		RETURN_FALSE;
 	}
 
@@ -761,17 +944,19 @@ PHP_FUNCTION(printer_start_doc)
    End a document */
 PHP_FUNCTION(printer_end_doc)
 {
-	zval **arg1;
+	zval *zres;
 	printer *resource;
 
-	if( zend_get_parameters_ex(1, &arg1) == FAILURE ) {
-		WRONG_PARAM_COUNT;
+	if (zend_parse_parameters(ZEND_NUM_ARGS(), "r", &zres) == FAILURE) {
+		RETURN_THROWS();
 	}
 
-	ZEND_FETCH_RESOURCE(resource, printer *, arg1, -1, "Printer Handle", le_printer);
+	if ((resource = (printer *)zend_fetch_resource(Z_RES_P(zres), "Printer Handle", le_printer)) == NULL) {
+		RETURN_THROWS();
+	}
 
 	if(EndDoc(resource->dc) < 0) {
-		php_error_docref(NULL TSRMLS_CC, E_WARNING, "couldn't terminate print job");
+		php_error_docref(NULL, E_WARNING, "couldn't terminate print job");
 		RETURN_FALSE;
 	}
 
@@ -784,17 +969,19 @@ PHP_FUNCTION(printer_end_doc)
    Start a page */
 PHP_FUNCTION(printer_start_page)
 {
-	zval **arg1;
+	zval *zres;
 	printer *resource;
 
-	if( ZEND_NUM_ARGS() == 1 && zend_get_parameters_ex(1, &arg1) != FAILURE ) {
-		;
+	if (zend_parse_parameters(ZEND_NUM_ARGS(), "r", &zres) == FAILURE) {
+		RETURN_THROWS();
 	}
 
-	ZEND_FETCH_RESOURCE(resource, printer *, arg1, -1, "Printer Handle", le_printer);
+	if ((resource = (printer *)zend_fetch_resource(Z_RES_P(zres), "Printer Handle", le_printer)) == NULL) {
+		RETURN_THROWS();
+	}
 
 	if(StartPage(resource->dc) < 0) {
-		php_error_docref(NULL TSRMLS_CC, E_WARNING, "couldn't start a new page");
+		php_error_docref(NULL, E_WARNING, "couldn't start a new page");
 		RETURN_FALSE;
 	}
 
@@ -807,17 +994,19 @@ PHP_FUNCTION(printer_start_page)
    End a page */
 PHP_FUNCTION(printer_end_page)
 {
-	zval **arg1;
+	zval *zres;
 	printer *resource;
 
-	if( zend_get_parameters_ex(1, &arg1) == FAILURE ) {
-		WRONG_PARAM_COUNT;
+	if (zend_parse_parameters(ZEND_NUM_ARGS(), "r", &zres) == FAILURE) {
+		RETURN_THROWS();
 	}
 
-	ZEND_FETCH_RESOURCE(resource, printer *, arg1, -1, "Printer Handle", le_printer);
+	if ((resource = (printer *)zend_fetch_resource(Z_RES_P(zres), "Printer Handle", le_printer)) == NULL) {
+		RETURN_THROWS();
+	}
 
 	if(EndPage(resource->dc) < 0) {
-		php_error_docref(NULL TSRMLS_CC, E_WARNING, "couldn't end the page");
+		php_error_docref(NULL, E_WARNING, "couldn't end the page");
 		RETURN_FALSE;
 	}
 
@@ -830,24 +1019,22 @@ PHP_FUNCTION(printer_end_page)
    Create a pen */
 PHP_FUNCTION(printer_create_pen)
 {
-	zval **arg1, **arg2, **arg3;
+	zend_long style, width;
+	char *color;
+	size_t color_len;
 	HPEN pen;
 
-	if( zend_get_parameters_ex(3, &arg1, &arg2, &arg3) == FAILURE ) {
-		WRONG_PARAM_COUNT;
+	if (zend_parse_parameters(ZEND_NUM_ARGS(), "lls", &style, &width, &color, &color_len) == FAILURE) {
+		RETURN_THROWS();
 	}
 
-	convert_to_long_ex(arg1);
-	convert_to_long_ex(arg2);
-	convert_to_string_ex(arg3);
-
-	pen = CreatePen(Z_LVAL_PP(arg1), Z_LVAL_PP(arg2), hex_to_rgb(Z_STRVAL_PP(arg3)));
+	pen = CreatePen(style, width, hex_to_rgb(color));
 
 	if(!pen) {
 		RETURN_FALSE;
 	}
 
-	ZEND_REGISTER_RESOURCE(return_value, pen, le_pen);
+	RETURN_RES(zend_register_resource(pen, le_pen));
 }
 /* }}} */
 
@@ -856,16 +1043,18 @@ PHP_FUNCTION(printer_create_pen)
    Delete a pen */
 PHP_FUNCTION(printer_delete_pen)
 {
-	zval **arg1;
+	zval *zres;
 	HPEN pen;
 	
-	if( zend_get_parameters_ex(1, &arg1) == FAILURE ) {
-		WRONG_PARAM_COUNT;
+	if (zend_parse_parameters(ZEND_NUM_ARGS(), "r", &zres) == FAILURE) {
+		RETURN_THROWS();
 	}
 
-	ZEND_FETCH_RESOURCE(pen, HPEN, arg1, -1, "Pen Handle", le_pen);
+	if ((pen = (HPEN)zend_fetch_resource(Z_RES_P(zres), "Pen Handle", le_pen)) == NULL) {
+		RETURN_THROWS();
+	}
 
-	zend_list_delete(Z_RESVAL_PP(arg1));
+	zend_list_close(Z_RES_P(zres));
 }
 /* }}} */
 
@@ -874,56 +1063,57 @@ PHP_FUNCTION(printer_delete_pen)
    Select a pen */
 PHP_FUNCTION(printer_select_pen)
 {
-	zval **arg1, **arg2;
+	zval *zres_printer, *zres_pen;
 	HPEN pen;
 	printer *resource;
 
-	if( zend_get_parameters_ex(2, &arg1, &arg2) == FAILURE ) {
-		WRONG_PARAM_COUNT;
+	if (zend_parse_parameters(ZEND_NUM_ARGS(), "rr", &zres_printer, &zres_pen) == FAILURE) {
+		RETURN_THROWS();
 	}
 
-	ZEND_FETCH_RESOURCE(resource, printer *, arg1, -1, "Printer Handle", le_printer);
-	ZEND_FETCH_RESOURCE(pen, HPEN, arg2, -1, "Pen Handle", le_pen);
+	if ((resource = (printer *)zend_fetch_resource(Z_RES_P(zres_printer), "Printer Handle", le_printer)) == NULL) {
+		RETURN_THROWS();
+	}
+	if ((pen = (HPEN)zend_fetch_resource(Z_RES_P(zres_pen), "Pen Handle", le_pen)) == NULL) {
+		RETURN_THROWS();
+	}
 
 	SelectObject(resource->dc, pen);
 }
 /* }}} */
 
 
-/* {{{ proto mixed printer_create_brush(resource handle)
-   Create a brush */
+/* {{{ proto mixed printer_create_brush(int style, string color_or_file)
+   Create a brush - color_or_file is a hex color for solid/hatch brushes, or bitmap path for custom brushes */
 PHP_FUNCTION(printer_create_brush)
 {
-	zval **arg1, **arg2;
+	zend_long style;
+	char *value;
+	size_t value_len;
 	HBRUSH brush;
 	HBITMAP bmp;
-	char* path;
 
-	if(zend_get_parameters_ex(2, &arg1, &arg2) == FAILURE ) {
-		WRONG_PARAM_COUNT;
+	if (zend_parse_parameters(ZEND_NUM_ARGS(), "ls", &style, &value, &value_len) == FAILURE) {
+		RETURN_THROWS();
 	}
 
-	convert_to_long_ex(arg1);
-	convert_to_string_ex(arg2);
-
-	switch(Z_LVAL_PP(arg1)) {
+	switch(style) {
 		case BRUSH_SOLID:
-			brush = CreateSolidBrush(hex_to_rgb(Z_STRVAL_PP(arg2)));
+			brush = CreateSolidBrush(hex_to_rgb(value));
 			break;
 		case BRUSH_CUSTOM:
-			virtual_filepath(Z_STRVAL_PP(arg2), &path TSRMLS_CC);
-			bmp = LoadImage(0, path, IMAGE_BITMAP, 0, 0, LR_LOADFROMFILE);
+			bmp = LoadImage(0, value, IMAGE_BITMAP, 0, 0, LR_LOADFROMFILE);
 			brush = CreatePatternBrush(bmp);
 			break;
 		default:
-			brush = CreateHatchBrush(Z_LVAL_PP(arg1), hex_to_rgb(Z_STRVAL_PP(arg2)));
+			brush = CreateHatchBrush(style, hex_to_rgb(value));
 	}
 
 	if(!brush) {
 		RETURN_FALSE;
 	}
 
-	ZEND_REGISTER_RESOURCE(return_value, brush, le_brush);
+	RETURN_RES(zend_register_resource(brush, le_brush));
 }
 /* }}} */
 
@@ -932,16 +1122,18 @@ PHP_FUNCTION(printer_create_brush)
    Delete a brush */
 PHP_FUNCTION(printer_delete_brush)
 {
-	zval **arg1;
+	zval *zres;
 	HBRUSH brush;
 	
-	if( zend_get_parameters_ex(1, &arg1) == FAILURE ) {
-		WRONG_PARAM_COUNT;
+	if (zend_parse_parameters(ZEND_NUM_ARGS(), "r", &zres) == FAILURE) {
+		RETURN_THROWS();
 	}
 
-	ZEND_FETCH_RESOURCE(brush, HBRUSH, arg1, -1, "Brush Handle", le_brush);
+	if ((brush = (HBRUSH)zend_fetch_resource(Z_RES_P(zres), "Brush Handle", le_brush)) == NULL) {
+		RETURN_THROWS();
+	}
 
-	zend_list_delete(Z_RESVAL_PP(arg1));
+	zend_list_close(Z_RES_P(zres));
 }
 /* }}} */
 
@@ -950,16 +1142,20 @@ PHP_FUNCTION(printer_delete_brush)
    Select a brush */
 PHP_FUNCTION(printer_select_brush)
 {
-	zval **arg1, **arg2;
+	zval *zres_printer, *zres_brush;
 	HBRUSH brush;
 	printer *resource;
 
-	if( zend_get_parameters_ex(2, &arg1, &arg2) == FAILURE ) {
-		WRONG_PARAM_COUNT;
+	if (zend_parse_parameters(ZEND_NUM_ARGS(), "rr", &zres_printer, &zres_brush) == FAILURE) {
+		RETURN_THROWS();
 	}
 
-	ZEND_FETCH_RESOURCE(resource, printer *, arg1, -1, "Printer Handle", le_printer);
-	ZEND_FETCH_RESOURCE(brush, HBRUSH, arg2, -1, "Brush Handle", le_brush);
+	if ((resource = (printer *)zend_fetch_resource(Z_RES_P(zres_printer), "Printer Handle", le_printer)) == NULL) {
+		RETURN_THROWS();
+	}
+	if ((brush = (HBRUSH)zend_fetch_resource(Z_RES_P(zres_brush), "Brush Handle", le_brush)) == NULL) {
+		RETURN_THROWS();
+	}
 
 	SelectObject(resource->dc, brush);
 }
@@ -970,32 +1166,28 @@ PHP_FUNCTION(printer_select_brush)
    Create a font */
 PHP_FUNCTION(printer_create_font)
 {
-	zval **arg1, **arg2, **arg3, **arg4, **arg5, **arg6, **arg7, **arg8;
+	char *face_param;
+	size_t face_len;
+	zend_long height, width, font_weight, orientation;
+	zend_bool italic, underline, strikeout;
 	HFONT font;
-	char *face;
+	char face[33];
 
-	if( zend_get_parameters_ex(8, &arg1, &arg2, &arg3, &arg4, &arg5, &arg6, &arg7, &arg8) == FAILURE ) {
-		WRONG_PARAM_COUNT;
+	if (zend_parse_parameters(ZEND_NUM_ARGS(), "sllllbbl", &face_param, &face_len, &height, &width, &font_weight, &italic, &underline, &strikeout, &orientation) == FAILURE) {
+		RETURN_THROWS();
 	}
 
-	convert_to_string_ex(arg1);
-	face = estrndup(Z_STRVAL_PP(arg1), 32);
-	convert_to_long_ex(arg2);
-	convert_to_long_ex(arg3);
-	convert_to_long_ex(arg4);
-	convert_to_boolean_ex(arg5);
-	convert_to_boolean_ex(arg6);
-	convert_to_boolean_ex(arg7);
-	convert_to_long_ex(arg8);
+	/* Copy up to 32 chars for face name */
+	strncpy(face, face_param, 32);
+	face[32] = '\0';
 
-	font = CreateFont(Z_LVAL_PP(arg2), Z_LVAL_PP(arg3), Z_LVAL_PP(arg8), Z_LVAL_PP(arg8), Z_LVAL_PP(arg4), Z_BVAL_PP(arg5), Z_BVAL_PP(arg6), Z_BVAL_PP(arg7), DEFAULT_CHARSET, OUT_DEFAULT_PRECIS, CLIP_DEFAULT_PRECIS, ANTIALIASED_QUALITY, DEFAULT_PITCH | FF_ROMAN, face);
-	efree(face);
+	font = CreateFont(height, width, orientation, orientation, font_weight, italic, underline, strikeout, DEFAULT_CHARSET, OUT_DEFAULT_PRECIS, CLIP_DEFAULT_PRECIS, ANTIALIASED_QUALITY, DEFAULT_PITCH | FF_ROMAN, face);
 
 	if(!font) {
 		RETURN_FALSE;
 	}
 
-	ZEND_REGISTER_RESOURCE(return_value, font, le_font);
+	RETURN_RES(zend_register_resource(font, le_font));
 }
 /* }}} */
 
@@ -1004,16 +1196,18 @@ PHP_FUNCTION(printer_create_font)
    Delete a font */
 PHP_FUNCTION(printer_delete_font)
 {
-	zval **arg1; 
+	zval *zres;
 	HFONT font;
 
-	if( zend_get_parameters_ex(1, &arg1) == FAILURE ) {
-		WRONG_PARAM_COUNT;
+	if (zend_parse_parameters(ZEND_NUM_ARGS(), "r", &zres) == FAILURE) {
+		RETURN_THROWS();
 	}
 	
-	ZEND_FETCH_RESOURCE(font, HFONT, arg1, -1, "Font Handle", le_font);
+	if ((font = (HFONT)zend_fetch_resource(Z_RES_P(zres), "Font Handle", le_font)) == NULL) {
+		RETURN_THROWS();
+	}
 
-	zend_list_delete(Z_RESVAL_PP(arg1));
+	zend_list_close(Z_RES_P(zres));
 }
 /* }}} */
 
@@ -1022,16 +1216,20 @@ PHP_FUNCTION(printer_delete_font)
    Select a font */
 PHP_FUNCTION(printer_select_font)
 {
-	zval **arg1, **arg2;
+	zval *zres_printer, *zres_font;
 	HFONT font;
 	printer *resource;
 
-	if( zend_get_parameters_ex(2, &arg1, &arg2) == FAILURE ) {
-		WRONG_PARAM_COUNT;
+	if (zend_parse_parameters(ZEND_NUM_ARGS(), "rr", &zres_printer, &zres_font) == FAILURE) {
+		RETURN_THROWS();
 	}
 
-	ZEND_FETCH_RESOURCE(resource, printer *, arg1, -1, "Printer Handle", le_printer);
-	ZEND_FETCH_RESOURCE(font, HFONT, arg2, -1, "Font Handle", le_font);
+	if ((resource = (printer *)zend_fetch_resource(Z_RES_P(zres_printer), "Printer Handle", le_printer)) == NULL) {
+		RETURN_THROWS();
+	}
+	if ((font = (HFONT)zend_fetch_resource(Z_RES_P(zres_font), "Font Handle", le_font)) == NULL) {
+		RETURN_THROWS();
+	}
 
 	SelectObject(resource->dc, font);
 }
@@ -1042,18 +1240,19 @@ PHP_FUNCTION(printer_select_font)
    Get the logical font height */
 PHP_FUNCTION(printer_logical_fontheight)
 {
-	zval **arg1, **arg2;
+	zval *zres;
+	zend_long height;
 	printer *resource;
 
-	if( zend_get_parameters_ex(2, &arg1, &arg2) == FAILURE ) {
-		WRONG_PARAM_COUNT;
+	if (zend_parse_parameters(ZEND_NUM_ARGS(), "rl", &zres, &height) == FAILURE) {
+		RETURN_THROWS();
 	}
 
-	ZEND_FETCH_RESOURCE(resource, printer *, arg1, -1, "Printer Handle", le_printer);
+	if ((resource = (printer *)zend_fetch_resource(Z_RES_P(zres), "Printer Handle", le_printer)) == NULL) {
+		RETURN_THROWS();
+	}
 
-	convert_to_long_ex(arg2);
-
-	RETURN_LONG(MulDiv(Z_LVAL_PP(arg2), GetDeviceCaps(resource->dc, LOGPIXELSY), 72));
+	RETURN_LONG(MulDiv(height, GetDeviceCaps(resource->dc, LOGPIXELSY), 72));
 }
 /* }}} */
 
@@ -1062,23 +1261,19 @@ PHP_FUNCTION(printer_logical_fontheight)
    Draw a roundrect */	
 PHP_FUNCTION(printer_draw_roundrect)
 {
-	zval **arg1, **arg2, **arg3, **arg4, **arg5, **arg6, **arg7; 
+	zval *zres;
+	zend_long ul_x, ul_y, lr_x, lr_y, width, height;
 	printer *resource;
 	
-	if( zend_get_parameters_ex(7, &arg1, &arg2, &arg3, &arg4, &arg5, &arg6, &arg7) == FAILURE ) {
-		WRONG_PARAM_COUNT;
+	if (zend_parse_parameters(ZEND_NUM_ARGS(), "rllllll", &zres, &ul_x, &ul_y, &lr_x, &lr_y, &width, &height) == FAILURE) {
+		RETURN_THROWS();
 	}
 
-	ZEND_FETCH_RESOURCE(resource, printer *, arg1, -1, "Printer Handle", le_printer);
+	if ((resource = (printer *)zend_fetch_resource(Z_RES_P(zres), "Printer Handle", le_printer)) == NULL) {
+		RETURN_THROWS();
+	}
 
-	convert_to_long_ex(arg2);
-	convert_to_long_ex(arg3);
-	convert_to_long_ex(arg4);
-	convert_to_long_ex(arg5);
-	convert_to_long_ex(arg6);
-	convert_to_long_ex(arg7);
-
-	RoundRect(resource->dc, Z_LVAL_PP(arg2), Z_LVAL_PP(arg3), Z_LVAL_PP(arg4), Z_LVAL_PP(arg5), Z_LVAL_PP(arg6), Z_LVAL_PP(arg7));
+	RoundRect(resource->dc, ul_x, ul_y, lr_x, lr_y, width, height);
 }
 /* }}} */
 
@@ -1087,21 +1282,19 @@ PHP_FUNCTION(printer_draw_roundrect)
    Draw a rectangle */
 PHP_FUNCTION(printer_draw_rectangle)
 {
-	zval **arg1, **arg2, **arg3, **arg4, **arg5; 
+	zval *zres;
+	zend_long ul_x, ul_y, lr_x, lr_y;
 	printer *resource;
 
-	if( zend_get_parameters_ex(5, &arg1, &arg2, &arg3, &arg4, &arg5) == FAILURE ) {
-		WRONG_PARAM_COUNT;
+	if (zend_parse_parameters(ZEND_NUM_ARGS(), "rllll", &zres, &ul_x, &ul_y, &lr_x, &lr_y) == FAILURE) {
+		RETURN_THROWS();
 	}
 
-	ZEND_FETCH_RESOURCE(resource, printer *, arg1, -1, "Printer Handle", le_printer);
+	if ((resource = (printer *)zend_fetch_resource(Z_RES_P(zres), "Printer Handle", le_printer)) == NULL) {
+		RETURN_THROWS();
+	}
 
-	convert_to_long_ex(arg2);
-	convert_to_long_ex(arg3);
-	convert_to_long_ex(arg4);
-	convert_to_long_ex(arg5);
-
-	Rectangle(resource->dc, Z_LVAL_PP(arg2), Z_LVAL_PP(arg3), Z_LVAL_PP(arg4), Z_LVAL_PP(arg5));
+	Rectangle(resource->dc, ul_x, ul_y, lr_x, lr_y);
 }
 /* }}} */
 
@@ -1110,21 +1303,19 @@ PHP_FUNCTION(printer_draw_rectangle)
    Draw an elipse */
 PHP_FUNCTION(printer_draw_elipse)
 {
-	zval **arg1, **arg2, **arg3, **arg4, **arg5; 
+	zval *zres;
+	zend_long ul_x, ul_y, lr_x, lr_y;
 	printer *resource;
 
-	if( zend_get_parameters_ex(5, &arg1, &arg2, &arg3, &arg4, &arg5) == FAILURE ) {
-		WRONG_PARAM_COUNT;
+	if (zend_parse_parameters(ZEND_NUM_ARGS(), "rllll", &zres, &ul_x, &ul_y, &lr_x, &lr_y) == FAILURE) {
+		RETURN_THROWS();
 	}
 
-	ZEND_FETCH_RESOURCE(resource, printer *, arg1, -1, "Printer Handle", le_printer);
+	if ((resource = (printer *)zend_fetch_resource(Z_RES_P(zres), "Printer Handle", le_printer)) == NULL) {
+		RETURN_THROWS();
+	}
 
-	convert_to_long_ex(arg2);
-	convert_to_long_ex(arg3);
-	convert_to_long_ex(arg4);
-	convert_to_long_ex(arg5);
-
-	Ellipse(resource->dc, Z_LVAL_PP(arg2), Z_LVAL_PP(arg3), Z_LVAL_PP(arg4), Z_LVAL_PP(arg5));
+	Ellipse(resource->dc, ul_x, ul_y, lr_x, lr_y);
 }
 /* }}} */
 
@@ -1133,20 +1324,21 @@ PHP_FUNCTION(printer_draw_elipse)
    Draw text */
 PHP_FUNCTION(printer_draw_text)
 {
-	zval **arg1, **arg2, **arg3, **arg4; 
+	zval *zres;
+	char *text;
+	size_t text_len;
+	zend_long x, y;
 	printer *resource;
 
-	if( zend_get_parameters_ex(4, &arg1, &arg2, &arg3, &arg4) == FAILURE ) {
-		WRONG_PARAM_COUNT;
+	if (zend_parse_parameters(ZEND_NUM_ARGS(), "rsll", &zres, &text, &text_len, &x, &y) == FAILURE) {
+		RETURN_THROWS();
 	}
 
-	ZEND_FETCH_RESOURCE(resource, printer *, arg1, -1, "Printer Handle", le_printer);
+	if ((resource = (printer *)zend_fetch_resource(Z_RES_P(zres), "Printer Handle", le_printer)) == NULL) {
+		RETURN_THROWS();
+	}
 
-	convert_to_string_ex(arg2);
-	convert_to_long_ex(arg3);
-	convert_to_long_ex(arg4);
-
-	ExtTextOut(resource->dc, Z_LVAL_PP(arg3), Z_LVAL_PP(arg4), ETO_OPAQUE, NULL, Z_STRVAL_PP(arg2), Z_STRLEN_PP(arg2), NULL);
+	ExtTextOut(resource->dc, x, y, ETO_OPAQUE, NULL, text, text_len, NULL);
 }
 /* }}} */
 
@@ -1155,22 +1347,20 @@ PHP_FUNCTION(printer_draw_text)
    Draw line from x, y to x, y*/
 PHP_FUNCTION(printer_draw_line)
 {
-	zval **arg1, **arg2, **arg3, **arg4, **arg5;
+	zval *zres;
+	zend_long fx, fy, tx, ty;
 	printer *resource;
 
-	if( zend_get_parameters_ex(5, &arg1, &arg2, &arg3, &arg4, &arg5) == FAILURE ) {
-		WRONG_PARAM_COUNT;
+	if (zend_parse_parameters(ZEND_NUM_ARGS(), "rllll", &zres, &fx, &fy, &tx, &ty) == FAILURE) {
+		RETURN_THROWS();
 	}
 
-	ZEND_FETCH_RESOURCE(resource, printer *, arg1, -1, "Printer Handle", le_printer);
+	if ((resource = (printer *)zend_fetch_resource(Z_RES_P(zres), "Printer Handle", le_printer)) == NULL) {
+		RETURN_THROWS();
+	}
 
-	convert_to_long_ex(arg2);
-	convert_to_long_ex(arg3);
-	convert_to_long_ex(arg4);
-	convert_to_long_ex(arg5);
-
-	MoveToEx(resource->dc, Z_LVAL_PP(arg2), Z_LVAL_PP(arg3), NULL);
-	LineTo(resource->dc, Z_LVAL_PP(arg4), Z_LVAL_PP(arg5));
+	MoveToEx(resource->dc, fx, fy, NULL);
+	LineTo(resource->dc, tx, ty);
 }
 /* }}} */
 
@@ -1179,25 +1369,19 @@ PHP_FUNCTION(printer_draw_line)
    Draw a chord*/
 PHP_FUNCTION(printer_draw_chord)
 {
-	zval **arg1, **arg2, **arg3, **arg4, **arg5, **arg6, **arg7, **arg8, **arg9;
+	zval *zres;
+	zend_long rec_x, rec_y, rec_x1, rec_y1, rad_x, rad_y, rad_x1, rad_y1;
 	printer *resource;
 
-	if( zend_get_parameters_ex(9, &arg1, &arg2, &arg3, &arg4, &arg5, &arg6, &arg7, &arg8, &arg9) == FAILURE ) {
-		WRONG_PARAM_COUNT;
+	if (zend_parse_parameters(ZEND_NUM_ARGS(), "rllllllll", &zres, &rec_x, &rec_y, &rec_x1, &rec_y1, &rad_x, &rad_y, &rad_x1, &rad_y1) == FAILURE) {
+		RETURN_THROWS();
 	}
 
-	ZEND_FETCH_RESOURCE(resource, printer *, arg1, -1, "Printer Handle", le_printer);
+	if ((resource = (printer *)zend_fetch_resource(Z_RES_P(zres), "Printer Handle", le_printer)) == NULL) {
+		RETURN_THROWS();
+	}
 
-	convert_to_long_ex(arg2);
-	convert_to_long_ex(arg3);
-	convert_to_long_ex(arg4);
-	convert_to_long_ex(arg5);
-	convert_to_long_ex(arg6);
-	convert_to_long_ex(arg7);
-	convert_to_long_ex(arg8);
-	convert_to_long_ex(arg9);
-
-	Chord(resource->dc, Z_LVAL_PP(arg2), Z_LVAL_PP(arg3), Z_LVAL_PP(arg4), Z_LVAL_PP(arg5), Z_LVAL_PP(arg6), Z_LVAL_PP(arg7), Z_LVAL_PP(arg8), Z_LVAL_PP(arg9));
+	Chord(resource->dc, rec_x, rec_y, rec_x1, rec_y1, rad_x, rad_y, rad_x1, rad_y1);
 }
 /* }}} */
 
@@ -1206,25 +1390,19 @@ PHP_FUNCTION(printer_draw_chord)
    Draw a pie*/
 PHP_FUNCTION(printer_draw_pie)
 {
-	zval **arg1, **arg2, **arg3, **arg4, **arg5, **arg6, **arg7, **arg8, **arg9;
+	zval *zres;
+	zend_long rec_x, rec_y, rec_x1, rec_y1, rad1_x, rad1_y, rad2_x, rad2_y;
 	printer *resource;
 
-	if( zend_get_parameters_ex(9, &arg1, &arg2, &arg3, &arg4, &arg5, &arg6, &arg7, &arg8, &arg9) == FAILURE ) {
-		WRONG_PARAM_COUNT;
+	if (zend_parse_parameters(ZEND_NUM_ARGS(), "rllllllll", &zres, &rec_x, &rec_y, &rec_x1, &rec_y1, &rad1_x, &rad1_y, &rad2_x, &rad2_y) == FAILURE) {
+		RETURN_THROWS();
 	}
 
-	ZEND_FETCH_RESOURCE(resource, printer *, arg1, -1, "Printer Handle", le_printer);
+	if ((resource = (printer *)zend_fetch_resource(Z_RES_P(zres), "Printer Handle", le_printer)) == NULL) {
+		RETURN_THROWS();
+	}
 
-	convert_to_long_ex(arg2);
-	convert_to_long_ex(arg3);
-	convert_to_long_ex(arg4);
-	convert_to_long_ex(arg5);
-	convert_to_long_ex(arg6);
-	convert_to_long_ex(arg7);
-	convert_to_long_ex(arg8);
-	convert_to_long_ex(arg9);
-
-	Pie(resource->dc, Z_LVAL_PP(arg2), Z_LVAL_PP(arg3), Z_LVAL_PP(arg4), Z_LVAL_PP(arg5), Z_LVAL_PP(arg6), Z_LVAL_PP(arg7), Z_LVAL_PP(arg8), Z_LVAL_PP(arg9));
+	Pie(resource->dc, rec_x, rec_y, rec_x1, rec_y1, rad1_x, rad1_y, rad2_x, rad2_y);
 }
 /* }}} */
 
@@ -1233,43 +1411,30 @@ PHP_FUNCTION(printer_draw_pie)
    Draw a bitmap */
 PHP_FUNCTION(printer_draw_bmp)
 {
-	zval **arg1, **arg2, **arg3, **arg4, **arg5 = NULL, **arg6 = NULL;
+	zval *zres;
+	char *filename;
+	size_t filename_len;
+	zend_long x, y, width = 0, height = 0;
 	printer *resource;
 	HBITMAP hbmp;
 	BITMAP bmp_property;
 	HDC dummy;
-	char* path;
+	int has_size;
 
-	int args = ZEND_NUM_ARGS();
-	switch (args) {
-		case 4:
-			if (zend_get_parameters_ex(4, &arg1, &arg2, &arg3, &arg4) == FAILURE ) {
-				RETURN_FALSE;
-			}
-			break;
-		case 6:
-			if (zend_get_parameters_ex(6, &arg1, &arg2, &arg3, &arg4, &arg5, &arg6) == FAILURE ) {
-				RETURN_FALSE;
-			}
-			convert_to_long_ex(arg5);
-			convert_to_long_ex(arg6);
-			break;
-		default:
-			WRONG_PARAM_COUNT;
-			break;
+	if (zend_parse_parameters(ZEND_NUM_ARGS(), "rsll|ll", &zres, &filename, &filename_len, &x, &y, &width, &height) == FAILURE) {
+		RETURN_THROWS();
 	}
 
-	ZEND_FETCH_RESOURCE(resource, printer *, arg1, -1, "Printer Handle", le_printer);
-	convert_to_string_ex(arg2);
-	convert_to_long_ex(arg3);
-	convert_to_long_ex(arg4);
+	has_size = (ZEND_NUM_ARGS() == 6);
 
-	virtual_filepath(Z_STRVAL_PP(arg2), &path TSRMLS_CC);
+	if ((resource = (printer *)zend_fetch_resource(Z_RES_P(zres), "Printer Handle", le_printer)) == NULL) {
+		RETURN_THROWS();
+	}
 
-	hbmp = (HBITMAP)LoadImage(0, path, IMAGE_BITMAP, 0, 0, LR_CREATEDIBSECTION|LR_LOADFROMFILE);
+	hbmp = (HBITMAP)LoadImage(0, filename, IMAGE_BITMAP, 0, 0, LR_CREATEDIBSECTION|LR_LOADFROMFILE);
 
 	if (hbmp == NULL) {
-		php_error_docref(NULL TSRMLS_CC, E_WARNING, "Failed to load bitmap %s", Z_STRVAL_PP(arg2));
+		php_error_docref(NULL, E_WARNING, "Failed to load bitmap %s", filename);
 		RETURN_FALSE;
 	}
 
@@ -1280,7 +1445,7 @@ PHP_FUNCTION(printer_draw_bmp)
 	}
 
 	if (!(GetDeviceCaps(resource->dc, RASTERCAPS) & RC_STRETCHBLT)) {
-		php_error_docref(NULL TSRMLS_CC, E_WARNING, "Printer does not support bitmaps");
+		php_error_docref(NULL, E_WARNING, "Printer does not support bitmaps");
 		DeleteObject(hbmp);
 		RETURN_FALSE;
 	}
@@ -1297,17 +1462,17 @@ PHP_FUNCTION(printer_draw_bmp)
 	}
 			
 	
-	if (args > 4) {
-		if (!StretchBlt(resource->dc,(int)Z_LVAL_PP(arg3), (int)Z_LVAL_PP(arg4), (int)Z_LVAL_PP(arg5), (int)Z_LVAL_PP(arg6), dummy, 0, 0, bmp_property.bmWidth,bmp_property.bmHeight, SRCCOPY)) {
-			php_error_docref(NULL TSRMLS_CC, E_WARNING, "Printer failed to accept bitmap");
+	if (has_size) {
+		if (!StretchBlt(resource->dc, (int)x, (int)y, (int)width, (int)height, dummy, 0, 0, bmp_property.bmWidth, bmp_property.bmHeight, SRCCOPY)) {
+			php_error_docref(NULL, E_WARNING, "Printer failed to accept bitmap");
 			DeleteDC(dummy);
 			DeleteObject(hbmp);
 			RETURN_FALSE;
 		}
 	}
 	else {
-		if (!BitBlt(resource->dc, Z_LVAL_PP(arg3), Z_LVAL_PP(arg4), bmp_property.bmWidth, bmp_property.bmHeight, dummy, 0, 0, SRCCOPY)) {
-			php_error_docref(NULL TSRMLS_CC, E_WARNING, "Printer failed to accept bitmap");
+		if (!BitBlt(resource->dc, x, y, bmp_property.bmWidth, bmp_property.bmHeight, dummy, 0, 0, SRCCOPY)) {
+			php_error_docref(NULL, E_WARNING, "Printer failed to accept bitmap");
 			DeleteDC(dummy);
 			DeleteObject(hbmp);
 			RETURN_FALSE;
@@ -1325,14 +1490,16 @@ PHP_FUNCTION(printer_draw_bmp)
    Abort printing*/
 PHP_FUNCTION(printer_abort)
 {
-	zval **arg1;
+	zval *zres;
 	printer *resource;
 
-	if( zend_get_parameters_ex(1, &arg1) == FAILURE ) {
-		WRONG_PARAM_COUNT;
+	if (zend_parse_parameters(ZEND_NUM_ARGS(), "r", &zres) == FAILURE) {
+		RETURN_THROWS();
 	}
 
-	ZEND_FETCH_RESOURCE(resource, printer *, arg1, -1, "Printer Handle", le_printer);
+	if ((resource = (printer *)zend_fetch_resource(Z_RES_P(zres), "Printer Handle", le_printer)) == NULL) {
+		RETURN_THROWS();
+	}
 	
 	AbortPrinter(resource->handle);
 }
@@ -1412,7 +1579,7 @@ char *rgb_to_hex(COLORREF rgb)
 	return string;
 } 
 
-static void printer_close(zend_rsrc_list_entry *resource TSRMLS_DC)
+static void printer_close(zend_resource *resource)
 {
 	printer *p = (printer*)resource->ptr;
 
@@ -1434,7 +1601,7 @@ static void printer_close(zend_rsrc_list_entry *resource TSRMLS_DC)
 	}
 	efree(p);
 }
-static void object_close(zend_rsrc_list_entry *resource TSRMLS_DC)
+static void object_close(zend_resource *resource)
 {
 	HGDIOBJ p = (HGDIOBJ)resource->ptr;
 	DeleteObject(p);
