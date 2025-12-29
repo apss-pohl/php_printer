@@ -25,12 +25,21 @@
 #define PHP_PRINTER_H
 
 #if HAVE_PRINTER
+
+#ifdef PHP_WIN32
 #include <Winspool.h>
+#else
+/* Linux/Unix CUPS support */
+#ifdef HAVE_CUPS
+#include <cups/cups.h>
+#include <cups/ppd.h>
+#endif
+#endif
 
 extern zend_module_entry printer_module_entry;
 #define printer_module_ptr &printer_module_entry
 
-#define PHP_PRINTER_VERSION "0.1.0-dev"
+#define PHP_PRINTER_VERSION "0.2.0"
 
 PHP_MINIT_FUNCTION(printer);
 PHP_MINFO_FUNCTION(printer);
@@ -68,6 +77,7 @@ PHP_FUNCTION(printer_draw_pie);
 PHP_FUNCTION(printer_draw_bmp);
 PHP_FUNCTION(printer_abort);
 
+#ifdef PHP_WIN32
 typedef struct {
 	HANDLE handle;
 	LPTSTR name;
@@ -76,6 +86,29 @@ typedef struct {
 	PRINTER_INFO_2 *pi2;
 	DWORD dmModifiedFields;
 } printer;
+#else
+/* Linux/Unix printer structure using CUPS */
+#ifdef HAVE_CUPS
+typedef struct {
+	http_t *http;
+	char *name;
+	char *title;
+	char *datatype;
+	int job_id;
+	cups_dest_t *dest;
+	int num_options;
+	cups_option_t *options;
+} printer;
+#else
+/* Dummy structure when CUPS is not available */
+typedef struct {
+	char *name;
+	char *title;
+	char *datatype;
+	int job_id;
+} printer;
+#endif /* HAVE_CUPS */
+#endif /* PHP_WIN32 */
 
 ZEND_BEGIN_MODULE_GLOBALS(printer)
 	char *default_printer;

@@ -41,12 +41,24 @@ static int le_printer, le_brush, le_pen, le_font;
 #include <winspool.h>
 
 #include "php_printer.h"
+#else
+/* Linux/Unix CUPS support */
+#ifdef HAVE_CUPS
+#include <cups/cups.h>
+#include <cups/ppd.h>
+#endif
 
-COLORREF hex_to_rgb(char * hex);
-char *rgb_to_hex(COLORREF rgb);
+#include "php_printer.h"
+#endif
+
 static void printer_close(zend_resource *resource);
 static void object_close(zend_resource *resource);
 char *get_default_printer(void);
+
+#ifdef PHP_WIN32
+COLORREF hex_to_rgb(char * hex);
+char *rgb_to_hex(COLORREF rgb);
+#endif
 
 /* Argument info declarations for PHP 7+ */
 ZEND_BEGIN_ARG_INFO_EX(arginfo_printer_open, 0, 0, 0)
@@ -296,7 +308,17 @@ PHP_MINFO_FUNCTION(printer)
 	php_info_print_table_start();
 	php_info_print_table_header(2, "Printer Support", "enabled");
 	php_info_print_table_row(2, "Version", PHP_PRINTER_VERSION);
+#ifdef PHP_WIN32
+	php_info_print_table_row(2, "Platform", "Windows (GDI)");
 	php_info_print_table_row(2, "Default printing device", PRINTERG(default_printer) ? PRINTERG(default_printer) : "<b>not detected</b>");
+#else
+#ifdef HAVE_CUPS
+	php_info_print_table_row(2, "Platform", "Linux/Unix (CUPS)");
+	php_info_print_table_row(2, "Default printing device", PRINTERG(default_printer) ? PRINTERG(default_printer) : "<b>not detected</b>");
+#else
+	php_info_print_table_row(2, "Platform", "Unsupported (CUPS not available)");
+#endif
+#endif
 	php_info_print_table_row(2, "Module state", "working");
 	php_info_print_table_row(2, "RCS Version", "$Id$");
 	php_info_print_table_end();
@@ -360,6 +382,8 @@ PHP_MINIT_FUNCTION(printer)
 	le_font		= zend_register_list_destructors_ex(object_close, NULL, "printer font", module_number);
 	le_brush	= zend_register_list_destructors_ex(object_close, NULL, "printer brush", module_number);
 
+#ifdef PHP_WIN32
+	/* Windows-specific constants */
 	REGP_CONSTANT("PRINTER_COPIES",				COPIES);
 	REGP_CONSTANT("PRINTER_MODE",				MODE);
 	REGP_CONSTANT("PRINTER_TITLE",				TITLE);
@@ -429,6 +453,11 @@ PHP_MINIT_FUNCTION(printer)
 	REGP_CONSTANT("PRINTER_ENUM_CONNECTIONS",	PRINTER_ENUM_CONNECTIONS);
 	REGP_CONSTANT("PRINTER_ENUM_NETWORK",		PRINTER_ENUM_NETWORK);
 	REGP_CONSTANT("PRINTER_ENUM_REMOTE",		PRINTER_ENUM_REMOTE);
+#else
+	/* Linux/Unix - minimal constants */
+	REGP_CONSTANT("PRINTER_ENUM_LOCAL",			2);
+	REGP_CONSTANT("PRINTER_ENUM_DEFAULT",		1);
+#endif
 
 	return SUCCESS;
 }
@@ -460,6 +489,8 @@ PHP_FUNCTION(printer_open)
 	}
 
 	resource = (printer *)emalloc(sizeof(printer));
+	
+#ifdef PHP_WIN32
 	resource->dmModifiedFields = 0;
 
 	if (printername != NULL) {
@@ -480,12 +511,84 @@ PHP_FUNCTION(printer_open)
 			resource->info.cbSize		= sizeof(resource->info);
 			resource->dc = CreateDC(NULL, resource->name, NULL, resource->pi2->pDevMode);
 			RETURN_RES(zend_register_resource(resource, le_printer));
+		} else {
+			/* Cleanup on DocumentProperties failure */
+			efree(resource->pi2->pDevMode);
+			efree(resource->pi2);
+			ClosePrinter(resource->handle);
+			{
+				char *printer_name = resource->name;
+				efree(resource);
+				php_error_docref(NULL, E_WARNING, "couldn't configure printer [%s]", printer_name);
+				RETURN_FALSE;
+			}
 		}
 	}
 	else {
 		php_error_docref(NULL, E_WARNING, "couldn't connect to the printer [%s]", resource->name);
+		efree(resource);
 		RETURN_FALSE;
 	}
+#else
+	/* Linux/Unix CUPS implementation */
+#ifdef HAVE_CUPS
+	cups_dest_t *dests;
+	int num_dests;
+	cups_dest_t *dest = NULL;
+	
+	if (printername != NULL) {
+		resource->name = estrdup(printername);
+	}
+	else {
+		resource->name = get_default_printer();
+		if (!resource->name) {
+			php_error_docref(NULL, E_WARNING, "no default printer found");
+			efree(resource);
+			RETURN_FALSE;
+		}
+	}
+	
+	num_dests = cupsGetDests(&dests);
+	if (num_dests < 0) {
+		php_error_docref(NULL, E_WARNING, "failed to get list of printers");
+		efree(resource->name);
+		efree(resource);
+		RETURN_FALSE;
+	}
+	dest = cupsGetDest(resource->name, NULL, num_dests, dests);
+	
+	if (dest) {
+		resource->dest = cupsCopyDest(dest, 0, NULL);
+		if (!resource->dest) {
+			cupsFreeDests(num_dests, dests);
+			php_error_docref(NULL, E_WARNING, "failed to copy printer destination for [%s]", resource->name);
+			efree(resource->name);
+			efree(resource);
+			RETURN_FALSE;
+		}
+		resource->http = NULL;
+		resource->job_id = 0;
+		resource->title = estrdup("PHP generated Document");
+		resource->datatype = estrdup("application/octet-stream");
+		resource->num_options = 0;
+		resource->options = NULL;
+		
+		cupsFreeDests(num_dests, dests);
+		RETURN_RES(zend_register_resource(resource, le_printer));
+	}
+	else {
+		cupsFreeDests(num_dests, dests);
+		php_error_docref(NULL, E_WARNING, "couldn't connect to the printer [%s]", resource->name);
+		efree(resource->name);
+		efree(resource);
+		RETURN_FALSE;
+	}
+#else
+	php_error_docref(NULL, E_WARNING, "CUPS support not compiled in");
+	efree(resource);
+	RETURN_FALSE;
+#endif /* HAVE_CUPS */
+#endif /* PHP_WIN32 */
 }
 /* }}} */
 
@@ -518,8 +621,6 @@ PHP_FUNCTION(printer_write)
 	char *content;
 	size_t content_len;
 	printer *resource;
-	DOC_INFO_1 docinfo;
-	int sd, sp = 0, received;
 
 	if (zend_parse_parameters(ZEND_NUM_ARGS(), "rs", &zres, &content, &content_len) == FAILURE) {
 		RETURN_THROWS();
@@ -528,6 +629,10 @@ PHP_FUNCTION(printer_write)
 	if ((resource = (printer *)zend_fetch_resource(Z_RES_P(zres), "Printer Handle", le_printer)) == NULL) {
 		RETURN_THROWS();
 	}
+
+#ifdef PHP_WIN32
+	DOC_INFO_1 docinfo;
+	int sd, sp = 0, received;
 
 	docinfo.pDocName	= (LPTSTR)resource->info.lpszDocName;
 	docinfo.pOutputFile	= (LPTSTR)resource->info.lpszOutput;
@@ -546,6 +651,53 @@ PHP_FUNCTION(printer_write)
 		php_error_docref(NULL, E_WARNING, "couldn't allocate the printerjob [%d]", GetLastError());
 		RETURN_FALSE;
 	}
+#else
+	/* Linux/Unix CUPS implementation */
+#ifdef HAVE_CUPS
+	int job_id;
+	
+	/* Create a print job and submit content */
+	job_id = cupsCreateJob(CUPS_HTTP_DEFAULT, resource->dest->name, resource->title, 
+	                       resource->num_options, resource->options);
+	
+	if (job_id == 0) {
+		php_error_docref(NULL, E_WARNING, "couldn't create print job: %s", cupsLastErrorString());
+		RETURN_FALSE;
+	}
+	
+	resource->job_id = job_id;
+	
+	if (cupsStartDocument(CUPS_HTTP_DEFAULT, resource->dest->name, job_id, 
+	                      resource->title, CUPS_FORMAT_RAW, 1) != HTTP_CONTINUE) {
+		php_error_docref(NULL, E_WARNING, "couldn't start document: %s", cupsLastErrorString());
+		if (resource->dest && resource->dest->name) {
+			cupsCancelJob(resource->dest->name, job_id);
+		}
+		RETURN_FALSE;
+	}
+	
+	if (cupsWriteRequestData(CUPS_HTTP_DEFAULT, content, content_len) != HTTP_CONTINUE) {
+		php_error_docref(NULL, E_WARNING, "couldn't write data: %s", cupsLastErrorString());
+		if (resource->dest && resource->dest->name) {
+			cupsCancelJob(resource->dest->name, job_id);
+		}
+		RETURN_FALSE;
+	}
+	
+	if (cupsFinishDocument(CUPS_HTTP_DEFAULT, resource->dest->name) != IPP_OK) {
+		php_error_docref(NULL, E_WARNING, "couldn't finish document: %s", cupsLastErrorString());
+		if (resource->dest && resource->dest->name) {
+			cupsCancelJob(resource->dest->name, job_id);
+		}
+		RETURN_FALSE;
+	}
+	
+	RETURN_TRUE;
+#else
+	php_error_docref(NULL, E_WARNING, "CUPS support not compiled in");
+	RETURN_FALSE;
+#endif /* HAVE_CUPS */
+#endif /* PHP_WIN32 */
 }
 /* }}} */
 
@@ -554,6 +706,7 @@ PHP_FUNCTION(printer_write)
    Return an array of printers attached to the server */
 PHP_FUNCTION(printer_list)
 {
+#ifdef PHP_WIN32
 	zval Printer;
 	char InfoBuffer[8192], *Name = NULL;
 	size_t Name_len = 0;
@@ -638,10 +791,84 @@ PHP_FUNCTION(printer_list)
 
 		add_index_zval(return_value, i, &Printer);
 	}
+#else
+	/* Linux/Unix CUPS implementation */
+#ifdef HAVE_CUPS
+	zval Printer;
+	cups_dest_t *dests;
+	int num_dests;
+	int i, j, array_index;
+	zend_long enumtype;
+	char *Name = NULL;
+	size_t Name_len = 0;
+	zend_long Level = 1;
+	
+	/* Parse parameters for compatibility */
+	if (zend_parse_parameters(ZEND_NUM_ARGS(), "l|sl", &enumtype, &Name, &Name_len, &Level) == FAILURE) {
+		RETURN_THROWS();
+	}
+	
+	/* Validate Level parameter - CUPS supports levels 1 and 2 */
+	if (Level != 1 && Level != 2) {
+		php_error_docref(NULL, E_WARNING, "Level not allowed (CUPS supports levels 1 and 2)");
+		RETURN_FALSE;
+	}
+	
+	array_init(return_value);
+	
+	num_dests = cupsGetDests(&dests);
+	if (num_dests < 0) {
+		php_error_docref(NULL, E_WARNING, "failed to get list of printers");
+		RETURN_FALSE;
+	}
+	
+	array_index = 0;
+	for (i = 0; i < num_dests; i++) {
+		/* Filter based on enumtype for better Windows compatibility */
+		if (enumtype == PRINTER_ENUM_DEFAULT && !dests[i].is_default) {
+			continue;
+		}
+		
+		/* Filter by name if provided */
+		if (Name != NULL && Name_len > 0) {
+			if (strcmp(dests[i].name, Name) != 0) {
+				continue;
+			}
+		}
+		
+		array_init(&Printer);
+		
+		/* Level 1: Basic information */
+		add_assoc_string(&Printer, "NAME", dests[i].name);
+		
+		if (dests[i].instance) {
+			add_assoc_string(&Printer, "INSTANCE", dests[i].instance);
+		}
+		
+		add_assoc_bool(&Printer, "IS_DEFAULT", dests[i].is_default);
+		
+		/* Level 2: Include printer options/attributes */
+		if (Level >= 2) {
+			for (j = 0; j < dests[i].num_options; j++) {
+				add_assoc_string(&Printer, dests[i].options[j].name, dests[i].options[j].value);
+			}
+		}
+		
+		add_index_zval(return_value, array_index, &Printer);
+		array_index++;
+	}
+	
+	cupsFreeDests(num_dests, dests);
+#else
+	php_error_docref(NULL, E_WARNING, "CUPS support not compiled in");
+	RETURN_FALSE;
+#endif /* HAVE_CUPS */
+#endif /* PHP_WIN32 */
 }
 
 /* }}} */
 
+#ifdef PHP_WIN32
 
 /* {{{ proto bool printer_set_option(resource connection,string option,mixed value)
    Configure the printer device */
@@ -1169,7 +1396,7 @@ PHP_FUNCTION(printer_create_font)
 	char *face_param;
 	size_t face_len;
 	zend_long height, width, font_weight, orientation;
-	zend_bool italic, underline, strikeout;
+	bool italic, underline, strikeout;
 	HFONT font;
 	char face[33];
 
@@ -1485,6 +1712,202 @@ PHP_FUNCTION(printer_draw_bmp)
 }
 /* }}} */
 
+#else /* Not PHP_WIN32 - Linux/Unix stubs for GDI functions */
+
+/* Stub implementations for Linux - these functions are Windows GDI-specific */
+
+PHP_FUNCTION(printer_set_option)
+{
+	php_error_docref(NULL, E_WARNING, "printer_set_option is only available on Windows (GDI)");
+	RETURN_FALSE;
+}
+
+PHP_FUNCTION(printer_get_option)
+{
+	php_error_docref(NULL, E_WARNING, "printer_get_option is only available on Windows (GDI)");
+	RETURN_FALSE;
+}
+
+PHP_FUNCTION(printer_create_dc)
+{
+	php_error_docref(NULL, E_WARNING, "printer_create_dc is only available on Windows (GDI)");
+	RETURN_FALSE;
+}
+
+PHP_FUNCTION(printer_delete_dc)
+{
+	php_error_docref(NULL, E_WARNING, "printer_delete_dc is only available on Windows (GDI)");
+	RETURN_FALSE;
+}
+
+PHP_FUNCTION(printer_start_doc)
+{
+	php_error_docref(NULL, E_WARNING, "printer_start_doc is only available on Windows (GDI)");
+	RETURN_FALSE;
+}
+
+PHP_FUNCTION(printer_end_doc)
+{
+	php_error_docref(NULL, E_WARNING, "printer_end_doc is only available on Windows (GDI)");
+	RETURN_FALSE;
+}
+
+PHP_FUNCTION(printer_start_page)
+{
+	php_error_docref(NULL, E_WARNING, "printer_start_page is only available on Windows (GDI)");
+	RETURN_FALSE;
+}
+
+PHP_FUNCTION(printer_end_page)
+{
+	php_error_docref(NULL, E_WARNING, "printer_end_page is only available on Windows (GDI)");
+	RETURN_FALSE;
+}
+
+PHP_FUNCTION(printer_create_pen)
+{
+	php_error_docref(NULL, E_WARNING, "printer_create_pen is only available on Windows (GDI)");
+	RETURN_FALSE;
+}
+
+PHP_FUNCTION(printer_delete_pen)
+{
+	php_error_docref(NULL, E_WARNING, "printer_delete_pen is only available on Windows (GDI)");
+	RETURN_FALSE;
+}
+
+PHP_FUNCTION(printer_select_pen)
+{
+	php_error_docref(NULL, E_WARNING, "printer_select_pen is only available on Windows (GDI)");
+	RETURN_FALSE;
+}
+
+PHP_FUNCTION(printer_create_brush)
+{
+	php_error_docref(NULL, E_WARNING, "printer_create_brush is only available on Windows (GDI)");
+	RETURN_FALSE;
+}
+
+PHP_FUNCTION(printer_delete_brush)
+{
+	php_error_docref(NULL, E_WARNING, "printer_delete_brush is only available on Windows (GDI)");
+	RETURN_FALSE;
+}
+
+PHP_FUNCTION(printer_select_brush)
+{
+	php_error_docref(NULL, E_WARNING, "printer_select_brush is only available on Windows (GDI)");
+	RETURN_FALSE;
+}
+
+PHP_FUNCTION(printer_create_font)
+{
+	php_error_docref(NULL, E_WARNING, "printer_create_font is only available on Windows (GDI)");
+	RETURN_FALSE;
+}
+
+PHP_FUNCTION(printer_delete_font)
+{
+	php_error_docref(NULL, E_WARNING, "printer_delete_font is only available on Windows (GDI)");
+	RETURN_FALSE;
+}
+
+PHP_FUNCTION(printer_select_font)
+{
+	php_error_docref(NULL, E_WARNING, "printer_select_font is only available on Windows (GDI)");
+	RETURN_FALSE;
+}
+
+PHP_FUNCTION(printer_logical_fontheight)
+{
+	php_error_docref(NULL, E_WARNING, "printer_logical_fontheight is only available on Windows (GDI)");
+	RETURN_FALSE;
+}
+
+PHP_FUNCTION(printer_draw_roundrect)
+{
+	php_error_docref(NULL, E_WARNING, "printer_draw_roundrect is only available on Windows (GDI)");
+	RETURN_FALSE;
+}
+
+PHP_FUNCTION(printer_draw_rectangle)
+{
+	php_error_docref(NULL, E_WARNING, "printer_draw_rectangle is only available on Windows (GDI)");
+	RETURN_FALSE;
+}
+
+PHP_FUNCTION(printer_draw_elipse)
+{
+	php_error_docref(NULL, E_WARNING, "printer_draw_elipse is only available on Windows (GDI)");
+	RETURN_FALSE;
+}
+
+PHP_FUNCTION(printer_draw_text)
+{
+	zval *args;
+	int argc;
+
+	if (zend_parse_parameters(ZEND_NUM_ARGS(), "*", &args, &argc) == FAILURE) {
+		RETURN_THROWS();
+	}
+
+	php_error_docref(NULL, E_WARNING, "printer_draw_text is only available on Windows (GDI)");
+	RETURN_FALSE;
+}
+
+PHP_FUNCTION(printer_draw_line)
+{
+	zval *args;
+	int argc;
+
+	if (zend_parse_parameters(ZEND_NUM_ARGS(), "*", &args, &argc) == FAILURE) {
+		RETURN_THROWS();
+	}
+
+	php_error_docref(NULL, E_WARNING, "printer_draw_line is only available on Windows (GDI)");
+	RETURN_FALSE;
+}
+
+PHP_FUNCTION(printer_draw_chord)
+{
+	zval *args;
+	int argc;
+
+	if (zend_parse_parameters(ZEND_NUM_ARGS(), "*", &args, &argc) == FAILURE) {
+		RETURN_THROWS();
+	}
+
+	php_error_docref(NULL, E_WARNING, "printer_draw_chord is only available on Windows (GDI)");
+	RETURN_FALSE;
+}
+
+PHP_FUNCTION(printer_draw_pie)
+{
+	zval *args;
+	int argc;
+
+	if (zend_parse_parameters(ZEND_NUM_ARGS(), "*", &args, &argc) == FAILURE) {
+		RETURN_THROWS();
+	}
+
+	php_error_docref(NULL, E_WARNING, "printer_draw_pie is only available on Windows (GDI)");
+	RETURN_FALSE;
+}
+
+PHP_FUNCTION(printer_draw_bmp)
+{
+	zval *args;
+	int argc;
+
+	if (zend_parse_parameters(ZEND_NUM_ARGS(), "*", &args, &argc) == FAILURE) {
+		RETURN_THROWS();
+	}
+	php_error_docref(NULL, E_WARNING, "printer_draw_bmp is only available on Windows (GDI)");
+	RETURN_FALSE;
+}
+
+#endif /* PHP_WIN32 */
+
 
 /* {{{ proto void printer_abort(resource handle)
    Abort printing*/
@@ -1501,11 +1924,21 @@ PHP_FUNCTION(printer_abort)
 		RETURN_THROWS();
 	}
 	
+#ifdef PHP_WIN32
 	AbortPrinter(resource->handle);
+#else
+#ifdef HAVE_CUPS
+	if (resource->job_id > 0 && resource->dest && resource->dest->name) {
+		cupsCancelJob(resource->dest->name, resource->job_id);
+	}
+#else
+	php_error_docref(NULL, E_WARNING, "CUPS support not compiled in");
+#endif
+#endif
 }
 /* }}} */
 
-
+#ifdef PHP_WIN32
 char *get_default_printer(void) {
 	PRINTER_INFO_2 *printer;
 	DWORD need, received;
@@ -1607,7 +2040,79 @@ static void object_close(zend_resource *resource)
 	DeleteObject(p);
 }
 
+#else
+/* Linux/Unix CUPS implementations */
+
+char *get_default_printer(void) {
+#ifdef HAVE_CUPS
+	cups_dest_t *dests;
+	int num_dests;
+	char *default_name = NULL;
+	int i;
+
+	num_dests = cupsGetDests(&dests);
+	if (num_dests < 0) {
+		return NULL;
+	}
+	
+	for (i = 0; i < num_dests; i++) {
+		if (dests[i].is_default) {
+			default_name = pestrdup(dests[i].name, 1);
+			break;
+		}
+	}
+	
+	if (!default_name && num_dests > 0) {
+		default_name = pestrdup(dests[0].name, 1);
+	}
+	
+	cupsFreeDests(num_dests, dests);
+	return default_name;
+#else
+	return NULL;
 #endif
+}
+
+static void printer_close(zend_resource *resource)
+{
+	printer *p = (printer*)resource->ptr;
+
+	if (!p) {
+		return;
+	}
+
+	/* The CUPS-related http field in struct printer is always NULL here,
+	 * because CUPS_HTTP_DEFAULT is used throughout this extension.
+	 * As a result, there is no http handle to close in this cleanup
+	 * function. */
+	if (p->name) {
+		efree(p->name);
+	}
+	if (p->title) {
+		efree(p->title);
+	}
+	if (p->datatype) {
+		efree(p->datatype);
+	}
+#ifdef HAVE_CUPS
+	if (p->dest) {
+		cupsFreeDests(1, p->dest);
+	}
+	if (p->options) {
+		cupsFreeOptions(p->num_options, p->options);
+	}
+#endif
+	efree(p);
+}
+
+static void object_close(zend_resource *resource)
+{
+	/* On Linux, we don't have GDI objects to clean up */
+	/* This is kept for API compatibility */
+}
+
+#endif /* PHP_WIN32 */
+
 #endif
 
 /*

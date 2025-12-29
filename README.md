@@ -1,6 +1,6 @@
 # PHP Printer Extension
 
-A PHP extension for direct printing to Windows printers, providing low-level access to Windows GDI and Print Spooler APIs.
+A PHP extension for printing support on both Windows and Linux systems.
 
 ## Authors and Credits
 
@@ -11,41 +11,120 @@ A PHP extension for direct printing to Windows printers, providing low-level acc
 **Contributors:**
 - Philippe MAES <luckyluke@dlfp.org>
 
-**PHP 7.4 Migration:**
-- Updated from PHP 5.6 API to PHP 7.4 API (2025)
+**PHP 7.4+ Migration:**
+- Updated from PHP 5.6 API to PHP 7.4+ API (2025)
+- Compatible with PHP 7.4, 8.0, 8.1, 8.2, and 8.3
+
+**Linux/CUPS Support:**
+- Added Linux support using CUPS (Common Unix Printing System) (2025)
 
 ## Overview
 
-This extension allows PHP scripts on Windows to:
+This extension allows PHP scripts to:
 - Open connections to printers
 - Send raw data to printers
 - Enumerate available printers
-- Configure printer settings
-- Draw graphics using GDI (pens, brushes, fonts)
-- Print bitmaps
-- Control document and page layout
+- Configure basic printer settings
+- **Windows Only:** Draw graphics using GDI (pens, brushes, fonts)
+- **Windows Only:** Print bitmaps
+- **Windows Only:** Advanced document and page layout control
 
-## Platform Requirements
+## Platform Support
 
-**Windows Only** - This extension uses Windows-specific APIs (GDI, winspool) and will only work on Windows systems.
+### Windows
+Full functionality with Windows GDI and Print Spooler APIs including advanced graphics and document control.
+
+### Linux
+Basic printing functionality using CUPS (Common Unix Printing System). Graphics functions (GDI-specific) are not available on Linux.
 
 ## Prerequisites
 
 ### Windows Build Requirements
 - Windows 10 or later
-- PHP 7.4 development files (PHP SDK)
+- PHP 7.4+ development files (PHP SDK) - supports PHP 7.4, 8.0, 8.1, 8.2, 8.3
 - Visual Studio 2017 or later (or Visual Studio Build Tools)
 - Windows SDK
 - Git for Windows
 
-### Linux
-**Note:** This extension cannot be built or used on Linux as it depends on Windows-specific APIs. The source code can be reviewed on Linux, but compilation and usage require Windows.
+### Linux Build Requirements
+- Linux distribution (Ubuntu, Debian, Fedora, RHEL, etc.)
+- PHP 7.4+ development files
+- CUPS development files:
+  - **Debian/Ubuntu:** `sudo apt-get install libcups2-dev`
+  - **RHEL/Fedora/CentOS:** `sudo yum install cups-devel` or `sudo dnf install cups-devel`
+  - **Arch Linux:** `sudo pacman -S cups`
+- GCC compiler
+- autoconf, automake, libtool
+
+## Building on Linux
+
+This extension can be built as a shared extension for PHP on Linux using CUPS.
+
+### Step 1: Install Prerequisites
+
+On Debian/Ubuntu:
+```bash
+sudo apt-get update
+sudo apt-get install php-dev libcups2-dev build-essential autoconf
+```
+
+On RHEL/Fedora/CentOS:
+```bash
+sudo yum install php-devel cups-devel gcc autoconf automake
+# or on newer systems
+sudo dnf install php-devel cups-devel gcc autoconf automake
+```
+
+### Step 2: Get Extension Source
+
+```bash
+git clone https://github.com/apss-pohl/php_printer.git
+cd php_printer
+```
+
+### Step 3: Build the Extension
+
+```bash
+phpize
+./configure --enable-printer
+make
+```
+
+### Step 4: Install
+
+```bash
+sudo make install
+```
+
+### Step 5: Enable Extension
+
+Add to your `php.ini`:
+```ini
+extension=printer.so
+```
+
+Verify installation:
+```bash
+php -m | grep printer
+```
+
+Or check with:
+```bash
+php -i | grep -i printer
+```
 
 ## Building on Windows
 
-### Step 1: Set Up PHP SDK
+This extension is designed to be built as an external (shared) extension, resulting in a `php_printer.dll` file that can be dynamically loaded by PHP.
 
-Download and set up the PHP SDK for Windows:
+### Method 1: Build as Standalone Extension (Recommended)
+
+This method builds the extension separately from PHP, which is the recommended approach for most users.
+
+#### Step 1: Prerequisites
+
+- Install PHP 7.4+ or PHP 8.x on your Windows system
+- Download and set up the PHP SDK for Windows:
 
 ```cmd
 git clone https://github.com/php/php-sdk-binary-tools.git c:\php-sdk
@@ -53,8 +132,63 @@ cd c:\php-sdk
 phpsdk-vs16-x64.bat
 ```
 
-### Step 2: Get PHP Source
+#### Step 2: Get Extension Source
 
+```cmd
+git clone https://github.com/apss-pohl/php_printer.git
+cd php_printer
+```
+
+#### Step 3: Configure for Shared Build
+
+```cmd
+phpize
+configure --enable-printer=shared --with-php-build=C:\php-sdk\phpdev\vs16\x64\deps
+```
+
+For PHP 7.4, use `vc15` instead of `vs16`:
+```cmd
+configure --enable-printer=shared --with-php-build=C:\php-sdk\phpdev\vc15\x64\deps
+```
+
+#### Step 4: Build
+
+```cmd
+nmake
+```
+
+#### Step 5: Install
+
+Copy the compiled DLL to your PHP extensions directory:
+
+```cmd
+copy x64\Release_TS\php_printer.dll C:\php\ext\
+```
+
+Or for NTS (Non-Thread-Safe) builds:
+```cmd
+copy x64\Release\php_printer.dll C:\php\ext\
+```
+
+#### Step 6: Enable Extension
+
+Add to your `php.ini`:
+```ini
+extension=php_printer
+```
+
+Verify installation:
+```cmd
+php -m | findstr printer
+```
+
+### Method 2: Build with PHP Source (Advanced)
+
+This method builds the extension alongside PHP source code, still producing a shared extension.
+
+#### Step 1: Get PHP Source
+
+For PHP 7.4:
 ```cmd
 phpsdk_buildtree phpdev
 cd phpdev\vc15\x64
@@ -63,7 +197,16 @@ cd php-7.4
 git checkout PHP-7.4
 ```
 
-### Step 3: Get Extension Source
+For PHP 8.x (e.g., PHP 8.3):
+```cmd
+phpsdk_buildtree phpdev
+cd phpdev\vs16\x64
+git clone https://github.com/php/php-src.git php-8.3
+cd php-8.3
+git checkout PHP-8.3
+```
+
+#### Step 2: Get Extension Source
 
 ```cmd
 cd ext
@@ -71,28 +214,17 @@ git clone https://github.com/apss-pohl/php_printer.git printer
 cd ..
 ```
 
-### Step 4: Build PHP with Printer Extension
+#### Step 3: Configure and Build as Shared Extension
 
 ```cmd
 buildconf
-configure --disable-all --enable-cli --enable-printer
+configure --disable-all --enable-cli --enable-printer=shared
 nmake
 ```
 
-### Step 5: Verify Build
+#### Step 4: Install
 
-```cmd
-nmake test TESTS=ext/printer/
-```
-
-Or manually:
-```cmd
-x64\Release_TS\php.exe -m | findstr printer
-```
-
-### Step 6: Install
-
-Copy the compiled `php_printer.dll` from the build directory to your PHP extensions directory:
+Copy the compiled DLL:
 
 ```cmd
 copy x64\Release_TS\php_printer.dll C:\php\ext\
@@ -100,7 +232,7 @@ copy x64\Release_TS\php_printer.dll C:\php\ext\
 
 Add to your `php.ini`:
 ```ini
-extension=php_printer.dll
+extension=php_printer
 ```
 
 Verify installation:
@@ -108,36 +240,9 @@ Verify installation:
 php -m | findstr printer
 ```
 
-## Building Standalone (Without Full PHP Build)
-
-If you already have PHP 7.4 installed:
-
-### Step 1: Use phpize
-
-```cmd
-cd path\to\php_printer
-phpize
-```
-
-### Step 2: Configure
-
-```cmd
-configure --with-php-build=C:\php-sdk\phpdev\vc15\x64\deps --enable-printer
-```
-
-### Step 3: Build
-
-```cmd
-nmake
-```
-
-### Step 4: Install
-
-```cmd
-copy Release\php_printer.dll C:\php\ext\
-```
-
 ## Quick Start Example
+
+### Basic Printing (Works on both Windows and Linux)
 
 ```php
 <?php
@@ -165,10 +270,11 @@ printer_write($handle, "Hello from PHP!");
 printer_close($handle);
 ```
 
-## Advanced Example - Drawing Graphics
+## Advanced Example - Drawing Graphics (Windows Only)
 
 ```php
 <?php
+// Note: Graphics functions only work on Windows
 $handle = printer_open();
 
 // Create device context
@@ -204,28 +310,31 @@ printer_close($handle);
 
 ## API Functions
 
-### Printer Management
+### Cross-Platform Functions (Windows and Linux)
 - `printer_open([string $printername])` - Open printer connection
 - `printer_close(resource $handle)` - Close printer connection
-- `printer_write(resource $handle, string $data)` - Write raw data
+- `printer_write(resource $handle, string $data)` - Write raw data to printer
 - `printer_list(int $enumtype [, string $name [, int $level]])` - List printers
 - `printer_abort(resource $handle)` - Abort current print job
 
-### Configuration
+### Windows-Only Functions (GDI Graphics)
+The following functions are only available on Windows and will produce warnings on Linux:
+
+#### Configuration
 - `printer_set_option(resource $handle, int $option, mixed $value)` - Set printer option
 - `printer_get_option(resource $handle, int $option)` - Get printer option
 
-### Device Context
+#### Device Context
 - `printer_create_dc(resource $handle)` - Create device context
 - `printer_delete_dc(resource $handle)` - Delete device context
 
-### Document Control
+#### Document Control
 - `printer_start_doc(resource $handle [, string $document])` - Start document
 - `printer_end_doc(resource $handle)` - End document
 - `printer_start_page(resource $handle)` - Start page
 - `printer_end_page(resource $handle)` - End page
 
-### Drawing Tools
+#### Drawing Tools
 - `printer_create_pen(int $style, int $width, string $color)` - Create pen
 - `printer_delete_pen(resource $pen)` - Delete pen
 - `printer_select_pen(resource $handle, resource $pen)` - Select pen
@@ -237,7 +346,7 @@ printer_close($handle);
 - `printer_select_font(resource $handle, resource $font)` - Select font
 - `printer_logical_fontheight(resource $handle, int $height)` - Get logical font height
 
-### Drawing Functions
+#### Drawing Functions
 - `printer_draw_text(resource $handle, string $text, int $x, int $y)` - Draw text
 - `printer_draw_line(resource $handle, int $fx, int $fy, int $tx, int $ty)` - Draw line
 - `printer_draw_rectangle(resource $handle, int $ul_x, int $ul_y, int $lr_x, int $lr_y)` - Draw rectangle
@@ -314,7 +423,7 @@ printer_close($handle);
 ### Extension not loading
 - Verify `php_printer.dll` is in the extensions directory
 - Check `extension=php_printer.dll` is in `php.ini`
-- Ensure you're using PHP 7.4 (check with `php -v`)
+- Ensure you're using PHP 7.4+ (check with `php -v`)
 - Check for missing dependencies with Dependency Walker
 
 ### Printer not found
@@ -323,20 +432,80 @@ printer_close($handle);
 - Try using `printer_list()` to see available printers
 
 ### Build errors
+
+**Windows:**
 - Ensure Visual Studio 2017 or later is installed
 - Verify PHP SDK is properly configured
 - Check that Windows SDK is installed
 - Make sure you're in the PHP SDK environment (`phpsdk-vs16-x64.bat`)
 
+**Linux:**
+- Ensure CUPS development files are installed (`libcups2-dev` or `cups-devel`)
+- Verify phpize is available (install `php-dev` or `php-devel`)
+- Check that `cups-config` is in your PATH
+- Make sure you have build tools installed (`build-essential` or `gcc`)
+
+## Linux-Specific Notes
+
+### Supported Functions on Linux
+The Linux implementation using CUPS supports the following core functions:
+- `printer_open()` - Opens a connection to a CUPS printer
+- `printer_close()` - Closes the printer connection
+- `printer_write()` - Sends raw data to the printer via CUPS
+- `printer_list()` - Lists available CUPS printers
+- `printer_abort()` - Cancels an active print job
+
+### Not Supported on Linux
+The following Windows GDI functions are not available on Linux:
+- All device context functions (`printer_create_dc`, `printer_delete_dc`)
+- All drawing functions (`printer_draw_*`)
+- All pen/brush/font creation functions
+- Graphics-related set/get option functions
+- Document/page control functions (`printer_start_doc`, etc.)
+
+Attempting to use these functions on Linux will result in a warning.
+
+### CUPS Configuration
+Make sure your CUPS service is running:
+```bash
+# Check CUPS status
+systemctl status cups
+
+# Start CUPS if not running
+sudo systemctl start cups
+
+# Enable CUPS to start on boot
+sudo systemctl enable cups
+```
+
+### Testing Printers on Linux
+List available printers:
+```bash
+lpstat -p -d
+```
+
+Add a printer if needed:
+```bash
+# Install CUPS management tool
+sudo apt-get install system-config-printer  # Debian/Ubuntu
+sudo yum install system-config-printer      # RHEL/Fedora
+
+# Run the GUI tool
+system-config-printer
+```
+
 ## Version History
 
 - **v0.1.0-dev** - Initial PHP 4/5 version
-- **v0.2.0** - PHP 7.4 compatibility update (2025)
-  - Migrated from PHP 5.6 API to PHP 7.4 API
+- **v0.2.0** - PHP 7.4+ and Linux/CUPS support (2025)
+  - Migrated from PHP 5.6 API to PHP 7.4+ API
+  - Added Linux/CUPS support for basic printing functions
   - Updated all deprecated functions
   - Modern parameter parsing
   - Updated resource management
   - Improved error handling
+  - Compatible with PHP 7.4, 8.0, 8.1, 8.2, and 8.3
+  - Cross-platform support: Windows (full GDI support) and Linux (CUPS support)
 
 ## License
 
@@ -350,7 +519,7 @@ Contributions are welcome! Please:
 1. Fork the repository
 2. Create a feature branch
 3. Make your changes
-4. Test on Windows with PHP 7.4
+4. Test on your target platform (Windows or Linux) with PHP 7.4+ or PHP 8.x
 5. Submit a pull request
 
 ## Support

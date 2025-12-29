@@ -1,0 +1,38 @@
+# Build artifacts
+*.o
+*.lo
+*.la
+*.so
+*.lai
+.libs/
+.deps/
+modules/
+
+# Autoconf/automake artifacts
+autom4te.cache/
+aclocal.m4
+build/
+config.h
+config.h.in
+config.log
+config.nice
+config.status
+configure
+configure.ac
+libtool
+Makefile
+Makefile.fragments
+Makefile.objects
+*.dep
+run-tests.php
+
+# Editor and IDE files
+*.swp
+*.swo
+*~
+.vscode/
+.idea/
+
+# OS files
+.DS_Store
+Thumbs.db
