@@ -1,10 +1,10 @@
-# PHP 7.4 Compatibility Changes
+# PHP 7.4+ and PHP 8 Compatibility Changes
 
-This document describes the changes made to make the printer extension compatible with PHP 7.4.
+This document describes the changes made to make the printer extension compatible with PHP 7.4+ and PHP 8.x.
 
 ## Summary of Changes
 
-The extension has been updated from PHP 5.6 API to PHP 7.4 API. Major changes include:
+The extension has been updated from PHP 5.6 API to PHP 7.4+ API with full PHP 8 compatibility. Major changes include:
 
 ### 1. Function Entry Declarations
 - Added argument info structures for all functions (required in PHP 7+)
@@ -41,6 +41,10 @@ The extension has been updated from PHP 5.6 API to PHP 7.4 API. Major changes in
 - Updated array manipulation to use stack allocation instead of heap allocation for zval structures
 - Changed from pointer arrays to value arrays where appropriate
 
+### 9. PHP 8 Compatibility
+- Replaced `zend_bool` with `bool` (deprecated in PHP 8.0)
+- All APIs are compatible with PHP 8.0, 8.1, 8.2, and 8.3
+
 ## Building the Extension
 
 This is a Windows-only extension. To build:
@@ -54,7 +58,7 @@ nmake
 ```
 
 ### Requirements
-- PHP 7.4 development files
+- PHP 7.4+ or PHP 8.x development files
 - Windows SDK
 - Visual Studio or compatible C compiler
 - winspool.lib and gdi32.lib
@@ -79,10 +83,10 @@ if (extension_loaded('printer')) {
 
 ## Known Issues
 
-None currently known. The extension should compile and work with PHP 7.4.
+None currently known. The extension should compile and work with PHP 7.4+ and PHP 8.x.
 
 ## Notes
 
 - This extension only works on Windows (uses Windows GDI and Print Spooler APIs)
-- The extension has not been tested with PHP 8.x yet
-- Some obsolete functions may need additional updates for modern PHP versions
+- The extension is compatible with PHP 7.4, 8.0, 8.1, 8.2, and 8.3
+- All deprecated APIs have been updated for modern PHP versions

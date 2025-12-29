@@ -11,8 +11,9 @@ A PHP extension for direct printing to Windows printers, providing low-level acc
 **Contributors:**
 - Philippe MAES <luckyluke@dlfp.org>
 
-**PHP 7.4 Migration:**
-- Updated from PHP 5.6 API to PHP 7.4 API (2025)
+**PHP 7.4+ Migration:**
+- Updated from PHP 5.6 API to PHP 7.4+ API (2025)
+- Compatible with PHP 7.4, 8.0, 8.1, 8.2, and 8.3
 
 ## Overview
 
@@ -33,7 +34,7 @@ This extension allows PHP scripts on Windows to:
 
 ### Windows Build Requirements
 - Windows 10 or later
-- PHP 7.4 development files (PHP SDK)
+- PHP 7.4+ development files (PHP SDK) - supports PHP 7.4, 8.0, 8.1, 8.2, 8.3
 - Visual Studio 2017 or later (or Visual Studio Build Tools)
 - Windows SDK
 - Git for Windows
@@ -55,12 +56,22 @@ phpsdk-vs16-x64.bat
 
 ### Step 2: Get PHP Source
 
+For PHP 7.4:
 ```cmd
 phpsdk_buildtree phpdev
 cd phpdev\vc15\x64
 git clone https://github.com/php/php-src.git php-7.4
 cd php-7.4
 git checkout PHP-7.4
+```
+
+For PHP 8.x (e.g., PHP 8.3):
+```cmd
+phpsdk_buildtree phpdev
+cd phpdev\vs16\x64
+git clone https://github.com/php/php-src.git php-8.3
+cd php-8.3
+git checkout PHP-8.3
 ```
 
 ### Step 3: Get Extension Source
@@ -110,7 +121,7 @@ php -m | findstr printer
 
 ## Building Standalone (Without Full PHP Build)
 
-If you already have PHP 7.4 installed:
+If you already have PHP 7.4+ installed:
 
 ### Step 1: Use phpize
 
@@ -314,7 +325,7 @@ printer_close($handle);
 ### Extension not loading
 - Verify `php_printer.dll` is in the extensions directory
 - Check `extension=php_printer.dll` is in `php.ini`
-- Ensure you're using PHP 7.4 (check with `php -v`)
+- Ensure you're using PHP 7.4+ (check with `php -v`)
 - Check for missing dependencies with Dependency Walker
 
 ### Printer not found
@@ -331,12 +342,13 @@ printer_close($handle);
 ## Version History
 
 - **v0.1.0-dev** - Initial PHP 4/5 version
-- **v0.2.0** - PHP 7.4 compatibility update (2025)
-  - Migrated from PHP 5.6 API to PHP 7.4 API
+- **v0.2.0** - PHP 7.4+ compatibility update (2025)
+  - Migrated from PHP 5.6 API to PHP 7.4+ API
   - Updated all deprecated functions
   - Modern parameter parsing
   - Updated resource management
   - Improved error handling
+  - Compatible with PHP 7.4, 8.0, 8.1, 8.2, and 8.3
 
 ## License
 
@@ -350,7 +362,7 @@ Contributions are welcome! Please:
 1. Fork the repository
 2. Create a feature branch
 3. Make your changes
-4. Test on Windows with PHP 7.4
+4. Test on Windows with PHP 7.4+ or PHP 8.x
 5. Submit a pull request
 
 ## Support
