@@ -78,7 +78,8 @@ PHP_FUNCTION(printer_draw_bmp);
 PHP_FUNCTION(printer_abort);
 
 #ifdef PHP_WIN32
-typedef struct {
+typedef struct
+{
   HANDLE handle;
   LPTSTR name;
   DOCINFO info;
@@ -89,7 +90,8 @@ typedef struct {
 #else
 /* Linux/Unix printer structure using CUPS */
 #ifdef HAVE_CUPS
-typedef struct {
+typedef struct
+{
   http_t *http;
   char *name;
   char *title;
@@ -101,7 +103,8 @@ typedef struct {
 } printer;
 #else
 /* Dummy structure when CUPS is not available */
-typedef struct {
+typedef struct
+{
   char *name;
   char *title;
   char *datatype;

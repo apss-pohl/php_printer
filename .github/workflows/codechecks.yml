@@ -2,11 +2,16 @@ name: PHP Printer Extension CI (No-Build Checks)
 
 on:
   workflow_dispatch:
+  pull_request:
+    branches: [main]
 
 jobs:
   c-static-analysis:
     name: C static analysis (no build)
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: write
 
     steps:
       - name: Checkout repository
@@ -15,26 +20,87 @@ jobs:
       # C linting only; this does NOT build the extension.
       # Restrict to C sources in this repo and use a reasonable set of checks.
       - name: C Linter (clang-tidy/clang-format) – no-build
+        id: linter
         uses: cpp-linter/cpp-linter-action@v2
         with:
-          # Limit analysis to actual C sources in this project
-          files: |
-            printer.c
-            php_printer.h
           # Run clang-tidy with a focused set of checks for C code
-          clang_tidy_checks: >
+          tidy-checks: >
             -*,
             bugprone-*,
             performance-*,
             readability-*,
             cert-*,
             clang-analyzer-*
-          # Only fail the check on more serious issues
-          fail_on: error
-          # Do not try to auto-fix code; just report
-          style: file
+          # Only check C/C++ files (default extensions)
+          extensions: c,h
+          # Use LLVM style for clang-format (no .clang-format file needed)
+          style: llvm
+          # Enable clang-tidy reviews
+          tidy-review: true
+          # Enable clang-format reviews
+          format-review: true
+          # Fail the workflow if any issues are found
+          passive-reviews: false
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      
+      # Auto-fix formatting issues with clang-format
+      - name: Apply clang-format fixes
+        if: success() || failure()
+        run: |
+          # Install clang-format if not available
+          sudo apt-get update
+          sudo apt-get install -y clang-format
+          
+          # Apply formatting to C files
+          find . -name "*.c" -o -name "*.h" -exec clang-format -i --style=llvm {} +
+      
+      # Note: clang-tidy --fix-errors requires compilation database (compile_commands.json)
+      # which needs a build. Since this is a no-build workflow, we skip clang-tidy auto-fixes.
+      # The cpp-linter-action above will still report clang-tidy issues in PR comments.
+      
+      # Get branch name for PR metadata
+      - name: Get branch name
+        id: names
+        run: |
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            echo "ref=${{ github.head_ref }}" >> $GITHUB_OUTPUT
+          else
+            echo "ref=${{ github.ref_name }}" >> $GITHUB_OUTPUT
+          fi
+          # Create a safe branch name (remove special characters)
+          safe_name=$(echo "${{ github.head_ref || github.ref_name }}" | sed 's/[^a-zA-Z0-9-]/_/g')
+          echo "safe=$safe_name" >> $GITHUB_OUTPUT
+      
+      # Create Pull Request with fixes
+      - name: Create Pull Request with fixes
+        id: cpr
+        uses: peter-evans/create-pull-request@v7
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          commit-message: "refactor: automated code style fixes"
+          branch: auto-fix/${{ steps.names.outputs.safe }}
+          branch-suffix: short-commit-hash
+          title: "Automated code fixes (${{ steps.names.outputs.ref }})"
+          body: |
+            This PR contains automated fixes for code style issues.
+            Source branch: `${{ steps.names.outputs.ref }}`
+            
+            The following fixes were applied:
+            - clang-format with LLVM style
+          base: ${{ github.base_ref || github.ref_name || github.event.repository.default_branch }}
+          delete-branch: true
+      
+      # Fail job if a PR was created (indicating there were issues to fix)
+      - name: Fail if PR was created
+        if: ${{ steps.cpr.outputs.pull-request-operation == 'created' }}
+        run: |
+          echo "Autofix created a PR: ${{ steps.cpr.outputs.pull-request-url }}"
+          exit 1
+      
+      - name: Fail fast?!
+        if: steps.linter.outputs.clang-tidy-checks-failed != '0'
+        run: exit 1
 
   markdown-metadata:
     name: Markdown metadata check (no build)
@@ -49,3 +115,85 @@ jobs:
           echo "Listing key Markdown files (if present):"
           ls README.md || echo "README.md not found"
           ls .github/copilot-instructions.md || echo ".github/copilot-instructions.md not found"
+
+  linux-build-with-tidy:
+    name: Linux build with clang-tidy auto-fixes
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: write
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v6
+
+      # Install PHP development files and CUPS for Linux build
+      - name: Install build dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y php-dev libcups2-dev clang-tidy bear
+
+      # Generate compilation database
+      - name: Build extension and generate compilation database
+        run: |
+          phpize
+          # Use bear to intercept build commands and generate compile_commands.json
+          bear -- sh -c './configure --with-cups && make'
+          echo "Compilation database generated"
+          ls -la compile_commands.json
+
+      # Apply clang-tidy fixes
+      - name: Apply clang-tidy fixes
+        run: |
+          # Run clang-tidy with auto-fixes
+          clang-tidy --fix-errors \
+            --checks="-*,bugprone-*,performance-*,readability-*,cert-*,clang-analyzer-*" \
+            -p . \
+            printer.c || true
+          
+          # Also check header file
+          clang-tidy --fix-errors \
+            --checks="-*,bugprone-*,performance-*,readability-*,cert-*,clang-analyzer-*" \
+            -p . \
+            php_printer.h || true
+
+      # Get branch name for PR metadata
+      - name: Get branch name
+        id: names
+        run: |
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            echo "ref=${{ github.head_ref }}" >> $GITHUB_OUTPUT
+          else
+            echo "ref=${{ github.ref_name }}" >> $GITHUB_OUTPUT
+          fi
+          # Create a safe branch name (remove special characters)
+          safe_name=$(echo "${{ github.head_ref || github.ref_name }}" | sed 's/[^a-zA-Z0-9-]/_/g')
+          echo "safe=$safe_name" >> $GITHUB_OUTPUT
+
+      # Create Pull Request with clang-tidy fixes
+      - name: Create Pull Request with clang-tidy fixes
+        id: cpr
+        uses: peter-evans/create-pull-request@v7
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          commit-message: "refactor: automated clang-tidy fixes (Linux build)"
+          branch: auto-fix-tidy/${{ steps.names.outputs.safe }}
+          branch-suffix: short-commit-hash
+          title: "Automated clang-tidy fixes - Linux (${{ steps.names.outputs.ref }})"
+          body: |
+            This PR contains automated fixes from clang-tidy analysis.
+            Source branch: `${{ steps.names.outputs.ref }}`
+            
+            The following fixes were applied:
+            - clang-tidy with bugprone, performance, readability, cert, and clang-analyzer checks
+            
+            This was run on a Linux build with CUPS support.
+          base: ${{ github.base_ref || github.ref_name || github.event.repository.default_branch }}
+          delete-branch: true
+
+      # Fail job if a PR was created (indicating there were issues to fix)
+      - name: Fail if PR was created
+        if: steps.cpr.outputs.pull-request-operation == 'created'
+        run: |
+          echo "Clang-tidy autofix created a PR: ${{ steps.cpr.outputs.pull-request-url }}"
+          exit 1
