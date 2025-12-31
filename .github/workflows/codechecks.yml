@@ -1,35 +1,34 @@
-name: PHP-GTK3 C++ CI (No-Build Checks)
+name: PHP Printer Extension CI (No-Build Checks)
 
 on:
   workflow_dispatch:
 
 jobs:
-  cpp-static-analysis:
-    name: C++ static analysis (no build)
+  c-static-analysis:
+    name: C static analysis (no build)
     runs-on: ubuntu-latest
 
     steps:
       - name: Checkout repository
         uses: actions/checkout@v6
 
-      # C++ linting only; this does NOT build the extension.
-      # Restrict to C++ sources in this repo and use a reasonable set of checks.
-      - name: C++ Linter (clang-tidy/clang-format) – no-build
+      # C linting only; this does NOT build the extension.
+      # Restrict to C sources in this repo and use a reasonable set of checks.
+      - name: C Linter (clang-tidy/clang-format) – no-build
         uses: cpp-linter/cpp-linter-action@v2
         with:
-          # Limit analysis to actual C++ sources in this project
+          # Limit analysis to actual C sources in this project
           files: |
-            main.cpp
-            php-gtk.cpp
-            src/**/*.cpp
-          # Run clang-tidy with a focused set of checks; this keeps noise manageable
+            printer.c
+            php_printer.h
+          # Run clang-tidy with a focused set of checks for C code
           clang_tidy_checks: >
             -*,
             bugprone-*,
             performance-*,
             readability-*,
-            modernize-*,
-            cppcoreguidelines-*
+            cert-*,
+            clang-analyzer-*
           # Only fail the check on more serious issues
           fail_on: error
           # Do not try to auto-fix code; just report
