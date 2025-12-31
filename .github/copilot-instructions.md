@@ -143,8 +143,8 @@ Instead of relying solely on in-repo documentation, **use official platform docu
 
 - **Windows GDI:**
   - Microsoft Docs: Windows GDI and Print Spooler APIs
-  - https://docs.microsoft.com/en-us/windows/win32/gdi/
-  - https://docs.microsoft.com/en-us/windows/win32/printdocs/
+  - https://learn.microsoft.com/en-us/windows/win32/gdi/
+  - https://learn.microsoft.com/en-us/windows/win32/printdocs/
 
 - **CUPS (Linux):**
   - CUPS API documentation: https://www.cups.org/doc/api-cups.html
