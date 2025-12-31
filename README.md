@@ -5,22 +5,27 @@ A PHP extension for printing support on both Windows and Linux systems.
 ## Authors and Credits
 
 **Original Authors:**
+
 - Frank M. Kromann <frank@kromann.info>
 - Daniel Beulshausen <daniel@php4win.de>
 
 **Contributors:**
+
 - Philippe MAES <luckyluke@dlfp.org>
 
 **PHP 7.4+ Migration:**
+
 - Updated from PHP 5.6 API to PHP 7.4+ API (2025)
 - Compatible with PHP 7.4, 8.0, 8.1, 8.2, and 8.3
 
 **Linux/CUPS Support:**
+
 - Added Linux support using CUPS (Common Unix Printing System) (2025)
 
 ## Overview
 
 This extension allows PHP scripts to:
+
 - Open connections to printers
 - Send raw data to printers
 - Enumerate available printers
@@ -32,14 +37,17 @@ This extension allows PHP scripts to:
 ## Platform Support
 
 ### Windows
+
 Full functionality with Windows GDI and Print Spooler APIs including advanced graphics and document control.
 
 ### Linux
+
 Basic printing functionality using CUPS (Common Unix Printing System). Graphics functions (GDI-specific) are not available on Linux.
 
 ## Prerequisites
 
 ### Windows Build Requirements
+
 - Windows 10 or later
 - PHP 7.4+ development files (PHP SDK) - supports PHP 7.4, 8.0, 8.1, 8.2, 8.3
 - Visual Studio 2017 or later (or Visual Studio Build Tools)
@@ -47,6 +55,7 @@ Basic printing functionality using CUPS (Common Unix Printing System). Graphics 
 - Git for Windows
 
 ### Linux Build Requirements
+
 - Linux distribution (Ubuntu, Debian, Fedora, RHEL, etc.)
 - PHP 7.4+ development files
 - CUPS development files:
@@ -63,12 +72,14 @@ This extension can be built as a shared extension for PHP on Linux using CUPS.
 ### Step 1: Install Prerequisites
 
 On Debian/Ubuntu:
+
 ```bash
 sudo apt-get update
 sudo apt-get install php-dev libcups2-dev build-essential autoconf
 ```
 
 On RHEL/Fedora/CentOS:
+
 ```bash
 sudo yum install php-devel cups-devel gcc autoconf automake
 # or on newer systems
@@ -99,16 +110,19 @@ sudo make install
 ### Step 5: Enable Extension
 
 Add to your `php.ini`:
+
 ```ini
 extension=printer.so
 ```
 
 Verify installation:
+
 ```bash
 php -m | grep printer
 ```
 
 Or check with:
+
 ```bash
 php -i | grep -i printer
 ```
@@ -132,7 +146,7 @@ cd c:\php-sdk
 phpsdk-vs16-x64.bat
 ```
 
-#### Step 2: Get Extension Source
+#### Step 2: Get Extension Source WIN
 
 ```cmd
 git clone https://github.com/apss-pohl/php_printer.git
@@ -147,6 +161,7 @@ configure --enable-printer=shared --with-php-build=C:\php-sdk\phpdev\vs16\x64\de
 ```
 
 For PHP 7.4, use `vc15` instead of `vs16`:
+
 ```cmd
 configure --enable-printer=shared --with-php-build=C:\php-sdk\phpdev\vc15\x64\deps
 ```
@@ -166,6 +181,7 @@ copy x64\Release_TS\php_printer.dll C:\php\ext\
 ```
 
 Or for NTS (Non-Thread-Safe) builds:
+
 ```cmd
 copy x64\Release\php_printer.dll C:\php\ext\
 ```
@@ -173,11 +189,13 @@ copy x64\Release\php_printer.dll C:\php\ext\
 #### Step 6: Enable Extension
 
 Add to your `php.ini`:
+
 ```ini
 extension=php_printer
 ```
 
 Verify installation:
+
 ```cmd
 php -m | findstr printer
 ```
@@ -189,6 +207,7 @@ This method builds the extension alongside PHP source code, still producing a sh
 #### Step 1: Get PHP Source
 
 For PHP 7.4:
+
 ```cmd
 phpsdk_buildtree phpdev
 cd phpdev\vc15\x64
@@ -198,6 +217,7 @@ git checkout PHP-7.4
 ```
 
 For PHP 8.x (e.g., PHP 8.3):
+
 ```cmd
 phpsdk_buildtree phpdev
 cd phpdev\vs16\x64
@@ -206,7 +226,7 @@ cd php-8.3
 git checkout PHP-8.3
 ```
 
-#### Step 2: Get Extension Source
+#### Step 2: Get Extension Source WIN Adv
 
 ```cmd
 cd ext
@@ -222,7 +242,7 @@ configure --disable-all --enable-cli --enable-printer=shared
 nmake
 ```
 
-#### Step 4: Install
+#### Step 4: Install WIN
 
 Copy the compiled DLL:
 
@@ -231,11 +251,13 @@ copy x64\Release_TS\php_printer.dll C:\php\ext\
 ```
 
 Add to your `php.ini`:
+
 ```ini
 extension=php_printer
 ```
 
 Verify installation:
+
 ```cmd
 php -m | findstr printer
 ```
@@ -311,6 +333,7 @@ printer_close($handle);
 ## API Functions
 
 ### Cross-Platform Functions (Windows and Linux)
+
 - `printer_open([string $printername])` - Open printer connection
 - `printer_close(resource $handle)` - Close printer connection
 - `printer_write(resource $handle, string $data)` - Write raw data to printer
@@ -318,23 +341,28 @@ printer_close($handle);
 - `printer_abort(resource $handle)` - Abort current print job
 
 ### Windows-Only Functions (GDI Graphics)
+
 The following functions are only available on Windows and will produce warnings on Linux:
 
 #### Configuration
+
 - `printer_set_option(resource $handle, int $option, mixed $value)` - Set printer option
 - `printer_get_option(resource $handle, int $option)` - Get printer option
 
 #### Device Context
+
 - `printer_create_dc(resource $handle)` - Create device context
 - `printer_delete_dc(resource $handle)` - Delete device context
 
 #### Document Control
+
 - `printer_start_doc(resource $handle [, string $document])` - Start document
 - `printer_end_doc(resource $handle)` - End document
 - `printer_start_page(resource $handle)` - Start page
 - `printer_end_page(resource $handle)` - End page
 
 #### Drawing Tools
+
 - `printer_create_pen(int $style, int $width, string $color)` - Create pen
 - `printer_delete_pen(resource $pen)` - Delete pen
 - `printer_select_pen(resource $handle, resource $pen)` - Select pen
@@ -347,6 +375,7 @@ The following functions are only available on Windows and will produce warnings 
 - `printer_logical_fontheight(resource $handle, int $height)` - Get logical font height
 
 #### Drawing Functions
+
 - `printer_draw_text(resource $handle, string $text, int $x, int $y)` - Draw text
 - `printer_draw_line(resource $handle, int $fx, int $fy, int $tx, int $ty)` - Draw line
 - `printer_draw_rectangle(resource $handle, int $ul_x, int $ul_y, int $lr_x, int $lr_y)` - Draw rectangle
@@ -359,6 +388,7 @@ The following functions are only available on Windows and will produce warnings 
 ## Constants
 
 ### Printer Enumeration
+
 - `PRINTER_ENUM_LOCAL` - Local printers
 - `PRINTER_ENUM_NAME` - Named printer
 - `PRINTER_ENUM_SHARED` - Shared printers
@@ -368,6 +398,7 @@ The following functions are only available on Windows and will produce warnings 
 - `PRINTER_ENUM_REMOTE` - Remote printers
 
 ### Pen Styles
+
 - `PRINTER_PEN_SOLID` - Solid pen
 - `PRINTER_PEN_DASH` - Dashed pen
 - `PRINTER_PEN_DOT` - Dotted pen
@@ -376,6 +407,7 @@ The following functions are only available on Windows and will produce warnings 
 - `PRINTER_PEN_INVISIBLE` - Invisible pen
 
 ### Brush Styles
+
 - `PRINTER_BRUSH_SOLID` - Solid brush
 - `PRINTER_BRUSH_CUSTOM` - Custom pattern brush
 - `PRINTER_BRUSH_DIAGONAL` - Diagonal hatch
@@ -386,6 +418,7 @@ The following functions are only available on Windows and will produce warnings 
 - `PRINTER_BRUSH_VERTICAL` - Vertical hatch
 
 ### Font Weights
+
 - `PRINTER_FW_THIN` - Thin
 - `PRINTER_FW_ULTRALIGHT` - Ultra light
 - `PRINTER_FW_LIGHT` - Light
@@ -396,6 +429,7 @@ The following functions are only available on Windows and will produce warnings 
 - `PRINTER_FW_HEAVY` - Heavy
 
 ### Text Alignment
+
 - `PRINTER_TA_BASELINE` - Baseline alignment
 - `PRINTER_TA_BOTTOM` - Bottom alignment
 - `PRINTER_TA_TOP` - Top alignment
@@ -404,6 +438,7 @@ The following functions are only available on Windows and will produce warnings 
 - `PRINTER_TA_RIGHT` - Right alignment
 
 ### Paper Formats
+
 - `PRINTER_FORMAT_CUSTOM` - Custom format
 - `PRINTER_FORMAT_LETTER` - Letter (8.5 x 11 in)
 - `PRINTER_FORMAT_LEGAL` - Legal (8.5 x 14 in)
@@ -415,18 +450,21 @@ The following functions are only available on Windows and will produce warnings 
 - `PRINTER_FORMAT_FOLIO` - Folio (8.5 x 13 in)
 
 ### Orientation
+
 - `PRINTER_ORIENTATION_PORTRAIT` - Portrait orientation
 - `PRINTER_ORIENTATION_LANDSCAPE` - Landscape orientation
 
 ## Troubleshooting
 
 ### Extension not loading
+
 - Verify `php_printer.dll` is in the extensions directory
 - Check `extension=php_printer.dll` is in `php.ini`
 - Ensure you're using PHP 7.4+ (check with `php -v`)
 - Check for missing dependencies with Dependency Walker
 
 ### Printer not found
+
 - Verify printer is installed and online in Windows
 - Check printer name matches exactly (case-sensitive)
 - Try using `printer_list()` to see available printers
@@ -434,12 +472,14 @@ The following functions are only available on Windows and will produce warnings 
 ### Build errors
 
 **Windows:**
+
 - Ensure Visual Studio 2017 or later is installed
 - Verify PHP SDK is properly configured
 - Check that Windows SDK is installed
 - Make sure you're in the PHP SDK environment (`phpsdk-vs16-x64.bat`)
 
 **Linux:**
+
 - Ensure CUPS development files are installed (`libcups2-dev` or `cups-devel`)
 - Verify phpize is available (install `php-dev` or `php-devel`)
 - Check that `cups-config` is in your PATH
@@ -448,7 +488,9 @@ The following functions are only available on Windows and will produce warnings 
 ## Linux-Specific Notes
 
 ### Supported Functions on Linux
+
 The Linux implementation using CUPS supports the following core functions:
+
 - `printer_open()` - Opens a connection to a CUPS printer
 - `printer_close()` - Closes the printer connection
 - `printer_write()` - Sends raw data to the printer via CUPS
@@ -456,7 +498,9 @@ The Linux implementation using CUPS supports the following core functions:
 - `printer_abort()` - Cancels an active print job
 
 ### Not Supported on Linux
+
 The following Windows GDI functions are not available on Linux:
+
 - All device context functions (`printer_create_dc`, `printer_delete_dc`)
 - All drawing functions (`printer_draw_*`)
 - All pen/brush/font creation functions
@@ -466,7 +510,9 @@ The following Windows GDI functions are not available on Linux:
 Attempting to use these functions on Linux will result in a warning.
 
 ### CUPS Configuration
+
 Make sure your CUPS service is running:
+
 ```bash
 # Check CUPS status
 systemctl status cups
@@ -479,12 +525,15 @@ sudo systemctl enable cups
 ```
 
 ### Testing Printers on Linux
+
 List available printers:
+
 ```bash
 lpstat -p -d
 ```
 
 Add a printer if needed:
+
 ```bash
 # Install CUPS management tool
 sudo apt-get install system-config-printer  # Debian/Ubuntu
@@ -516,6 +565,7 @@ Copyright (c) 1997-2003 The PHP Group
 ## Contributing
 
 Contributions are welcome! Please:
+
 1. Fork the repository
 2. Create a feature branch
 3. Make your changes
@@ -525,6 +575,7 @@ Contributions are welcome! Please:
 ## Support
 
 For issues and questions:
+
 - Open an issue on GitHub
 - Check existing documentation
 - Review example code
