@@ -108,7 +108,7 @@ When implementing new functionality or fixing bugs:
    - Match patterns such as:
      - Function naming conventions.
      - Parameter parsing using `zend_parse_parameters()`.
-     - Resource fetching using `ZEND_FETCH_RESOURCE()`.
+     - Resource fetching using `zend_fetch_resource()`.
      - Return value handling.
 
 4. **Maintain PHP extension conventions**:
