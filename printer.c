@@ -357,8 +357,8 @@ PHP_INI_END()
 #define DRIVER_VERSION	14
 #define OUTPUT_FILE		15
 #define VALID_OPTIONS	16
-#define BRUSH_SOLID		-1
-#define BRUSH_CUSTOM	-2
+#define BRUSH_SOLID		(-1)
+#define BRUSH_CUSTOM	(-2)
 
 #define REGP_CONSTANT(a,b)	REGISTER_LONG_CONSTANT(a, b, CONST_CS | CONST_PERSISTENT);
 
@@ -797,7 +797,9 @@ PHP_FUNCTION(printer_list)
 	zval Printer;
 	cups_dest_t *dests;
 	int num_dests;
-	int i, j, array_index;
+	int i;
+	int j;
+	int array_index;
 	zend_long enumtype;
 	char *Name = NULL;
 	size_t Name_len = 0;
