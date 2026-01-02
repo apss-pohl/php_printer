@@ -35,10 +35,11 @@ jobs:
           extensions: c,h
           # Use LLVM style for clang-format (no .clang-format file needed)
           style: llvm
-          # Enable clang-tidy reviews
-          tidy-review: true
-          # Enable clang-format reviews
-          format-review: true
+          # Disable review comments - auto-fix PRs will be created instead
+          tidy-review: false
+          format-review: false
+          # Disable thread comments to avoid cluttering the PR
+          thread-comments: false
           # Fail the workflow if any issues are found
           passive-reviews: false
         env:
