@@ -569,11 +569,14 @@ PHP_FUNCTION(printer_open)
 		/* For older CUPS versions, manually copy the destination */
 		resource->dest = (cups_dest_t *)emalloc(sizeof(cups_dest_t));
 		if (resource->dest) {
-			memcpy(resource->dest, dest, sizeof(cups_dest_t));
-			if (dest->name) resource->dest->name = estrdup(dest->name);
-			if (dest->instance) resource->dest->instance = estrdup(dest->instance);
+			/* Explicitly initialize fields to avoid shallow-copying internal pointers */
+			resource->dest->name = NULL;
+			resource->dest->instance = NULL;
+			resource->dest->is_default = dest->is_default;
 			resource->dest->num_options = 0;
 			resource->dest->options = NULL;
+			if (dest->name) resource->dest->name = estrdup(dest->name);
+			if (dest->instance) resource->dest->instance = estrdup(dest->instance);
 		}
 		#endif
 		if (!resource->dest) {
