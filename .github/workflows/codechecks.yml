@@ -116,16 +116,39 @@ jobs:
     permissions:
       contents: write
       pull-requests: write
+    strategy:
+      matrix:
+        php-version: ['7.4', '8.0', '8.1', '8.2', '8.3']
+      fail-fast: false
 
     steps:
       - name: Checkout repository
         uses: actions/checkout@v6
 
-      # Install PHP development files and CUPS for Linux build
+      # Setup PHP with development tools using setup-php action
+      # This provides consistent PHP versions and is faster than apt-get
+      - name: Setup PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: ${{ matrix.php-version }}
+          tools: phpize
+          coverage: none
+
+      # Cache apt packages to speed up builds
+      - name: Cache apt packages
+        uses: actions/cache@v4
+        with:
+          path: |
+            /var/cache/apt/archives
+          key: ${{ runner.os }}-apt-${{ hashFiles('**/codechecks.yml') }}
+          restore-keys: |
+            ${{ runner.os }}-apt-
+
+      # Install CUPS and analysis tools
       - name: Install build dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y php-dev libcups2-dev clang-tidy bear
+          sudo apt-get install -y libcups2-dev clang-tidy bear
 
       # Generate compilation database
       - name: Build extension and generate compilation database
@@ -185,8 +208,10 @@ jobs:
           echo "safe=$safe_name" >> $GITHUB_OUTPUT
 
       # Create Pull Request with clang-tidy fixes
+      # Only create PR from PHP 8.1 build to avoid duplicate PRs
       - name: Create Pull Request with clang-tidy fixes
         id: cpr
+        if: success() && matrix.php-version == '8.1'
         uses: peter-evans/create-pull-request@v7
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
