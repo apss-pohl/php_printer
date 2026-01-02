@@ -41,6 +41,11 @@ extern zend_module_entry printer_module_entry;
 
 #define PHP_PRINTER_VERSION "0.2.0"
 
+/* Compatibility macro for PHP < 8.0 */
+#ifndef RETURN_THROWS
+#define RETURN_THROWS() return
+#endif
+
 PHP_MINIT_FUNCTION(printer);
 PHP_MINFO_FUNCTION(printer);
 PHP_MSHUTDOWN_FUNCTION(printer);
