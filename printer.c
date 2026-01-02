@@ -590,33 +590,17 @@ PHP_FUNCTION(printer_open)
 			resource->dest->instance = estrdup(dest->instance);
 		}
 		
-		/* Deep-copy printer options to preserve configuration */
+		/* Copy printer options using CUPS API to preserve configuration safely */
+		resource->dest->num_options = 0;
+		resource->dest->options = NULL;
 		if (dest->num_options > 0 && dest->options) {
-			int i;
-			resource->dest->options = (cups_option_t *)emalloc(dest->num_options * sizeof(cups_option_t));
-			if (!resource->dest->options) {
-				/* Allocation for options failed; clean up and signal failure */
-				if (resource->dest->name) {
-					efree(resource->dest->name);
-				}
-				if (resource->dest->instance) {
-					efree(resource->dest->instance);
-				}
-				efree(resource->dest);
-				if (resource->name) {
-					efree(resource->name);
-				}
-				efree(resource);
-				cupsFreeDests(num_dests, dests);
-				php_error_docref(NULL, E_WARNING, "failed to allocate memory for printer options [%s]", resource->name);
-				RETURN_FALSE;
-			}
-			
-			resource->dest->num_options = dest->num_options;
-			for (i = 0; i < dest->num_options; i++) {
-				resource->dest->options[i].name = dest->options[i].name ? estrdup(dest->options[i].name) : NULL;
-				resource->dest->options[i].value = dest->options[i].value ? estrdup(dest->options[i].value) : NULL;
-			}
+			/* cupsCopyOptions allocates memory compatible with cupsFreeOptions/cupsFreeDests */
+			resource->dest->num_options = cupsCopyOptions(
+				dest->num_options,
+				dest->options,
+				0,
+				&resource->dest->options
+			);
 		}
 		#endif
 		if (!resource->dest) {
