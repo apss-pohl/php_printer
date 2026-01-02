@@ -1,0 +1,13 @@
+---
+# clang-format configuration for PHP printer extension
+BasedOnStyle: LLVM
+IndentWidth: 4
+TabWidth: 4
+UseTab: ForIndentation
+ColumnLimit: 120
+BreakBeforeBraces: Linux
+AllowShortIfStatementsOnASingleLine: false
+IndentCaseLabels: false
+# Critical: Do NOT let clang-format modify or remove includes
+SortIncludes: false
+IncludeBlocks: Preserve

@@ -25,11 +25,11 @@
 #include "config.h"
 #endif
 
+#include "php.h"
+#include "php_ini.h"
 #include "ext/standard/info.h"
 #include "ext/standard/php_math.h"
 #include "ext/standard/php_string.h"
-#include "php.h"
-#include "php_ini.h"
 
 #ifdef HAVE_PRINTER
 
