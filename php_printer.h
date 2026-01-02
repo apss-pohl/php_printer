@@ -102,8 +102,7 @@ typedef struct
 } printer;
 #else
 /* Dummy structure when CUPS is not available */
-typedef struct
-{
+typedef struct {
   char *name;
   char *title;
   char *datatype;
