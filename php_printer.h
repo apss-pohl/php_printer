@@ -78,6 +78,7 @@ PHP_FUNCTION(printer_draw_bmp);
 PHP_FUNCTION(printer_abort);
 
 #ifdef PHP_WIN32
+#ifdef PHP_WIN32
 typedef struct {
   HANDLE handle;
   LPTSTR name;
