@@ -51,8 +51,9 @@ jobs:
           find . -name "*.c" -o -name "*.h" -exec clang-format -i --style=llvm {} +
       
       # Note: clang-tidy --fix-errors requires compilation database (compile_commands.json)
-      # which needs a build. Since this is a no-build workflow, we skip clang-tidy auto-fixes.
-      # The cpp-linter-action above will still report clang-tidy issues in PR comments.
+      # which needs a build. Since this is a no-build workflow, we skip clang-tidy here entirely
+      # (clang-tidy checks are disabled via tidy-checks: ''). Full clang-tidy analysis runs only
+      # in the separate linux-build-with-tidy job.
       
       # Get branch name for PR metadata
       - name: Get branch name
