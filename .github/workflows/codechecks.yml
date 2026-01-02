@@ -36,6 +36,9 @@ jobs:
           thread-comments: false
           # Fail the workflow if any issues are found
           passive-reviews: false
+          # Extra args to handle missing config.h (not built yet in this job)
+          # This allows clang-format to work without a full build environment
+          extra-args: "-UHAVE_CONFIG_H"
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
