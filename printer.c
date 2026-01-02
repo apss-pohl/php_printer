@@ -46,6 +46,10 @@ static int le_printer, le_brush, le_pen, le_font;
 #ifdef HAVE_CUPS
 #include <cups/cups.h>
 #include <cups/ppd.h>
+
+/* Define printer enumeration constants for Linux/CUPS compatibility */
+#define PRINTER_ENUM_DEFAULT    1
+#define PRINTER_ENUM_LOCAL      2
 #endif
 
 #include "php_printer.h"
@@ -558,7 +562,20 @@ PHP_FUNCTION(printer_open)
 	dest = cupsGetDest(resource->name, NULL, num_dests, dests);
 	
 	if (dest) {
+		/* cupsCopyDest returns cups_dest_t* in CUPS 1.6+, int in older versions */
+		#if CUPS_VERSION_MAJOR >= 2 || (CUPS_VERSION_MAJOR == 1 && CUPS_VERSION_MINOR >= 6)
 		resource->dest = cupsCopyDest(dest, 0, NULL);
+		#else
+		/* For older CUPS versions, manually copy the destination */
+		resource->dest = (cups_dest_t *)emalloc(sizeof(cups_dest_t));
+		if (resource->dest) {
+			memcpy(resource->dest, dest, sizeof(cups_dest_t));
+			if (dest->name) resource->dest->name = estrdup(dest->name);
+			if (dest->instance) resource->dest->instance = estrdup(dest->instance);
+			resource->dest->num_options = 0;
+			resource->dest->options = NULL;
+		}
+		#endif
 		if (!resource->dest) {
 			cupsFreeDests(num_dests, dests);
 			php_error_docref(NULL, E_WARNING, "failed to copy printer destination for [%s]", resource->name);
