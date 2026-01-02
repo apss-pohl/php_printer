@@ -585,14 +585,31 @@ PHP_FUNCTION(printer_open)
 		
 		if (dest->name) {
 			resource->dest->name = estrdup(dest->name);
+			if (!resource->dest->name) {
+				efree(resource->dest);
+				cupsFreeDests(num_dests, dests);
+				php_error_docref(NULL, E_WARNING, "failed to allocate memory for printer name [%s]", resource->name);
+				efree(resource->name);
+				efree(resource);
+				RETURN_FALSE;
+			}
 		}
 		if (dest->instance) {
 			resource->dest->instance = estrdup(dest->instance);
+			if (!resource->dest->instance) {
+				if (resource->dest->name) {
+					efree(resource->dest->name);
+				}
+				efree(resource->dest);
+				cupsFreeDests(num_dests, dests);
+				php_error_docref(NULL, E_WARNING, "failed to allocate memory for printer instance [%s]", resource->name);
+				efree(resource->name);
+				efree(resource);
+				RETURN_FALSE;
+			}
 		}
 		
 		/* Copy printer options using CUPS API to preserve configuration safely */
-		resource->dest->num_options = 0;
-		resource->dest->options = NULL;
 		if (dest->num_options > 0 && dest->options) {
 			/* cupsCopyOptions allocates memory compatible with cupsFreeOptions/cupsFreeDests */
 			resource->dest->num_options = cupsCopyOptions(
@@ -601,6 +618,20 @@ PHP_FUNCTION(printer_open)
 				0,
 				&resource->dest->options
 			);
+			if (resource->dest->num_options == 0 || !resource->dest->options) {
+				if (resource->dest->name) {
+					efree(resource->dest->name);
+				}
+				if (resource->dest->instance) {
+					efree(resource->dest->instance);
+				}
+				efree(resource->dest);
+				cupsFreeDests(num_dests, dests);
+				php_error_docref(NULL, E_WARNING, "failed to copy printer options for [%s]", resource->name);
+				efree(resource->name);
+				efree(resource);
+				RETURN_FALSE;
+			}
 		}
 		#endif
 		if (!resource->dest) {

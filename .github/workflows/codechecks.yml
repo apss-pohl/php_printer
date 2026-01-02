@@ -71,6 +71,7 @@ jobs:
       # Create Pull Request with fixes
       - name: Create Pull Request with fixes
         id: cpr
+        if: success() && steps.linter.outputs.checks-failed != '0'
         uses: peter-evans/create-pull-request@v7
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
@@ -87,7 +88,8 @@ jobs:
           base: ${{ github.event_name == 'workflow_dispatch' && github.event.repository.default_branch || github.base_ref || github.ref_name || github.event.repository.default_branch }}
           delete-branch: true
       
-      # Fail job if a PR was created (indicating there were issues to fix)
+      # Fail job if a PR was created (indicating clang-format made fixes)
+      # Note: create-pull-request only creates a PR if there are actual changes
       - name: Fail if PR was created
         if: steps.cpr.outputs.pull-request-operation == 'created'
         run: |
@@ -203,7 +205,8 @@ jobs:
           base: ${{ github.event_name == 'workflow_dispatch' && github.event.repository.default_branch || github.base_ref || github.ref_name || github.event.repository.default_branch }}
           delete-branch: true
 
-      # Fail job if a PR was created (indicating there were issues to fix)
+      # Fail job if a PR was created (indicating clang-tidy made fixes)
+      # Note: create-pull-request only creates a PR if there are actual changes
       - name: Fail if PR was created
         if: steps.cpr.outputs.pull-request-operation == 'created'
         run: |
