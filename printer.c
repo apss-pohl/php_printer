@@ -568,30 +568,48 @@ PHP_FUNCTION(printer_open)
 		#else
 		/* For older CUPS versions (or when version macros unavailable), manually copy the destination */
 		resource->dest = (cups_dest_t *)emalloc(sizeof(cups_dest_t));
-		if (resource->dest) {
-			/* Explicitly initialize fields to avoid shallow-copying internal pointers */
-			resource->dest->name = NULL;
-			resource->dest->instance = NULL;
-			resource->dest->is_default = dest->is_default;
-			resource->dest->num_options = 0;
-			resource->dest->options = NULL;
-			if (dest->name) resource->dest->name = estrdup(dest->name);
-			if (dest->instance) resource->dest->instance = estrdup(dest->instance);
-			/* Deep-copy printer options to preserve configuration */
-			if (dest->num_options > 0 && dest->options) {
-				cupsCopyOptions(dest->num_options, dest->options,
-					&resource->dest->num_options, &resource->dest->options);
-			}
-			/* Deep-copy printer options to preserve configuration */
-			if (dest->num_options > 0 && dest->options) {
-				resource->dest->num_options = dest->num_options;
-				resource->dest->options = (cups_option_t *)emalloc(dest->num_options * sizeof(cups_option_t));
-				if (resource->dest->options) {
-					for (int i = 0; i < dest->num_options; i++) {
-						resource->dest->options[i].name = dest->options[i].name ? estrdup(dest->options[i].name) : NULL;
-						resource->dest->options[i].value = dest->options[i].value ? estrdup(dest->options[i].value) : NULL;
-					}
+		if (!resource->dest) {
+			cupsFreeDests(num_dests, dests);
+			php_error_docref(NULL, E_WARNING, "failed to allocate memory for printer destination [%s]", resource->name);
+			RETURN_FALSE;
+		}
+		
+		/* Explicitly initialize fields to avoid shallow-copying internal pointers */
+		resource->dest->name = NULL;
+		resource->dest->instance = NULL;
+		resource->dest->is_default = dest->is_default;
+		resource->dest->num_options = 0;
+		resource->dest->options = NULL;
+		
+		if (dest->name) {
+			resource->dest->name = estrdup(dest->name);
+		}
+		if (dest->instance) {
+			resource->dest->instance = estrdup(dest->instance);
+		}
+		
+		/* Deep-copy printer options to preserve configuration */
+		if (dest->num_options > 0 && dest->options) {
+			int i;
+			resource->dest->options = (cups_option_t *)emalloc(dest->num_options * sizeof(cups_option_t));
+			if (!resource->dest->options) {
+				/* Allocation for options failed; clean up and signal failure */
+				if (resource->dest->name) {
+					efree(resource->dest->name);
 				}
+				if (resource->dest->instance) {
+					efree(resource->dest->instance);
+				}
+				efree(resource->dest);
+				cupsFreeDests(num_dests, dests);
+				php_error_docref(NULL, E_WARNING, "failed to allocate memory for printer options [%s]", resource->name);
+				RETURN_FALSE;
+			}
+			
+			resource->dest->num_options = dest->num_options;
+			for (i = 0; i < dest->num_options; i++) {
+				resource->dest->options[i].name = dest->options[i].name ? estrdup(dest->options[i].name) : NULL;
+				resource->dest->options[i].value = dest->options[i].value ? estrdup(dest->options[i].value) : NULL;
 			}
 		}
 		#endif
