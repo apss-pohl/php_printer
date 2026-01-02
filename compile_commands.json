@@ -1,0 +1,31 @@
+[
+  {
+    "arguments": [
+      "/usr/bin/cc",
+      "-I.",
+      "-I/home/runner/work/php_printer/php_printer",
+      "-I/home/runner/work/php_printer/php_printer/include",
+      "-I/home/runner/work/php_printer/php_printer/main",
+      "-I/home/runner/work/php_printer/php_printer",
+      "-I/usr/include/php/20210902",
+      "-I/usr/include/php/20210902/main",
+      "-I/usr/include/php/20210902/TSRM",
+      "-I/usr/include/php/20210902/Zend",
+      "-I/usr/include/php/20210902/ext",
+      "-I/usr/include/php/20210902/ext/date/lib",
+      "-DHAVE_CONFIG_H",
+      "-g",
+      "-O2",
+      "-DZEND_COMPILE_DL_EXT=1",
+      "-c",
+      "-fPIC",
+      "-DPIC",
+      "-o",
+      ".libs/printer.o",
+      "/home/runner/work/php_printer/php_printer/printer.c"
+    ],
+    "directory": "/home/runner/work/php_printer/php_printer",
+    "file": "/home/runner/work/php_printer/php_printer/printer.c",
+    "output": "/home/runner/work/php_printer/php_printer/.libs/printer.o"
+  }
+]
