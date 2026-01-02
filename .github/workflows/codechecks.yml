@@ -51,7 +51,8 @@ jobs:
           sudo apt-get install -y clang-format
 
           # Apply formatting to tracked C files only (avoid vendor/build dirs)
-          git ls-files '*.c' '*.h' | xargs -r clang-format -i --style=llvm
+          # Use --style=file to respect .clang-format configuration
+          git ls-files '*.c' '*.h' | xargs -r clang-format -i --style=file
 
       # Get branch name for PR metadata
       - name: Get branch name
@@ -82,7 +83,7 @@ jobs:
             Source branch: `${{ steps.names.outputs.ref }}`
 
             The following fixes were applied:
-            - clang-format with LLVM style
+            - clang-format with project style (.clang-format config)
           base: ${{ github.event_name == 'pull_request' && github.head_ref || github.event.repository.default_branch }}
           delete-branch: true
 
