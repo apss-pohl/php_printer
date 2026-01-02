@@ -579,6 +579,11 @@ PHP_FUNCTION(printer_open)
 			if (dest->instance) resource->dest->instance = estrdup(dest->instance);
 			/* Deep-copy printer options to preserve configuration */
 			if (dest->num_options > 0 && dest->options) {
+				cupsCopyOptions(dest->num_options, dest->options,
+					&resource->dest->num_options, &resource->dest->options);
+			}
+			/* Deep-copy printer options to preserve configuration */
+			if (dest->num_options > 0 && dest->options) {
 				resource->dest->num_options = dest->num_options;
 				resource->dest->options = (cups_option_t *)emalloc(dest->num_options * sizeof(cups_option_t));
 				if (resource->dest->options) {
