@@ -611,7 +611,10 @@ PHP_FUNCTION(printer_open)
 		
 		/* Copy printer options using CUPS API to preserve configuration safely */
 		if (dest->num_options > 0 && dest->options) {
-			/* cupsCopyOptions allocates memory compatible with cupsFreeOptions/cupsFreeDests */
+			/* cupsCopyOptions allocates memory for the options array using CUPS routines,
+			 * which must later be freed via cupsFreeOptions/cupsFreeDests. The dest->name
+			 * and dest->instance fields above are allocated via strdup() (malloc-based)
+			 * but remain compatible with cupsFreeDests, which uses standard free(). */
 			resource->dest->num_options = cupsCopyOptions(
 				dest->num_options,
 				dest->options,
@@ -619,11 +622,15 @@ PHP_FUNCTION(printer_open)
 				&resource->dest->options
 			);
 			if (resource->dest->num_options == 0 || !resource->dest->options) {
+				/* Clean up allocated options if any */
+				if (resource->dest->options) {
+					cupsFreeOptions(resource->dest->num_options, resource->dest->options);
+				}
 				if (resource->dest->name) {
-					efree(resource->dest->name);
+					free(resource->dest->name);
 				}
 				if (resource->dest->instance) {
-					efree(resource->dest->instance);
+					free(resource->dest->instance);
 				}
 				efree(resource->dest);
 				cupsFreeDests(num_dests, dests);
