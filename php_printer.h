@@ -89,8 +89,7 @@ typedef struct {
 #else
 /* Linux/Unix printer structure using CUPS */
 #ifdef HAVE_CUPS
-typedef struct
-{
+typedef struct {
   http_t *http;
   char *name;
   char *title;
