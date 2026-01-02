@@ -27,8 +27,8 @@ jobs:
           tidy-checks: ""
           # Only check C/C++ files (default extensions)
           extensions: c,h
-          # Use LLVM style for clang-format (no .clang-format file needed)
-          style: llvm
+          # Use .clang-format file in repository
+          style: file
           # Disable review comments - auto-fix PRs will be created instead
           tidy-review: false
           format-review: false
