@@ -140,7 +140,8 @@ jobs:
         with:
           path: |
             /var/cache/apt/archives
-          key: ${{ runner.os }}-apt-${{ hashFiles('**/codechecks.yml') }}
+            /var/lib/apt/lists
+          key: ${{ runner.os }}-apt-libcups2-clang-tidy-bear
           restore-keys: |
             ${{ runner.os }}-apt-
 
