@@ -200,7 +200,7 @@ jobs:
             - clang-tidy with bugprone, performance, readability, cert, and clang-analyzer checks
             
             This was run on a Linux build with CUPS support.
-          base: ${{ github.base_ref || github.ref_name || github.event.repository.default_branch }}
+          base: ${{ github.event_name == 'workflow_dispatch' && github.event.repository.default_branch || github.base_ref || github.ref_name || github.event.repository.default_branch }}
           delete-branch: true
 
       # Fail job if a PR was created (indicating there were issues to fix)

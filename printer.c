@@ -571,6 +571,8 @@ PHP_FUNCTION(printer_open)
 		if (!resource->dest) {
 			cupsFreeDests(num_dests, dests);
 			php_error_docref(NULL, E_WARNING, "failed to allocate memory for printer destination [%s]", resource->name);
+			efree(resource->name);
+			efree(resource);
 			RETURN_FALSE;
 		}
 		
@@ -601,6 +603,10 @@ PHP_FUNCTION(printer_open)
 					efree(resource->dest->instance);
 				}
 				efree(resource->dest);
+				if (resource->name) {
+					efree(resource->name);
+				}
+				efree(resource);
 				cupsFreeDests(num_dests, dests);
 				php_error_docref(NULL, E_WARNING, "failed to allocate memory for printer options [%s]", resource->name);
 				RETURN_FALSE;
