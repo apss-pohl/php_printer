@@ -18,19 +18,13 @@ jobs:
         uses: actions/checkout@v6
 
       # C linting only; this does NOT build the extension.
-      # Restrict to C sources in this repo and use a reasonable set of checks.
-      - name: C Linter (clang-tidy/clang-format) – no-build
+      # Only run clang-format checks here (clang-tidy needs build environment)
+      - name: C Linter (clang-format only) – no-build
         id: linter
         uses: cpp-linter/cpp-linter-action@v2
         with:
-          # Run clang-tidy with a focused set of checks for C code
-          tidy-checks: >
-            -*,
-            bugprone-*,
-            performance-*,
-            readability-*,
-            cert-*,
-            clang-analyzer-*
+          # Disable clang-tidy in no-build workflow (runs in linux-build-with-tidy job instead)
+          tidy-checks: ''
           # Only check C/C++ files (default extensions)
           extensions: c,h
           # Use LLVM style for clang-format (no .clang-format file needed)
@@ -99,10 +93,6 @@ jobs:
           echo "Autofix created a PR: ${{ steps.cpr.outputs.pull-request-url }}"
           exit 1
       
-      - name: Fail fast?!
-        if: steps.linter.outputs.clang-tidy-checks-failed != '0'
-        run: exit 1
-
   markdown-metadata:
     name: Markdown metadata check (no build)
     runs-on: ubuntu-latest
