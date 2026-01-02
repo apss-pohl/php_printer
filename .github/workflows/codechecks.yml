@@ -1,4 +1,4 @@
-name: PHP Printer Extension CI (No-Build Checks)
+name: PHP Printer Extension CI
 
 on:
   workflow_dispatch:
@@ -7,7 +7,7 @@ on:
 
 jobs:
   c-static-analysis:
-    name: C static analysis (no build)
+    name: C static analysis
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -19,12 +19,12 @@ jobs:
 
       # C linting only; this does NOT build the extension.
       # Only run clang-format checks here (clang-tidy needs build environment)
-      - name: C Linter (clang-format only) – no-build
+      - name: C Linter (clang-format only)
         id: linter
         uses: cpp-linter/cpp-linter-action@v2
         with:
           # Disable clang-tidy in no-build workflow (runs in linux-build-with-tidy job instead)
-          tidy-checks: ''
+          tidy-checks: ""
           # Only check C/C++ files (default extensions)
           extensions: c,h
           # Use LLVM style for clang-format (no .clang-format file needed)
@@ -38,7 +38,7 @@ jobs:
           passive-reviews: false
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      
+
       # Auto-fix formatting issues with clang-format (only if linter detected issues)
       - name: Apply clang-format fixes
         if: success() && steps.linter.outputs.checks-failed != '0'
@@ -46,15 +46,10 @@ jobs:
           # Install clang-format if not available
           sudo apt-get update
           sudo apt-get install -y clang-format
-          
+
           # Apply formatting to tracked C files only (avoid vendor/build dirs)
           git ls-files '*.c' '*.h' | xargs -r clang-format -i --style=llvm
-      
-      # Note: clang-tidy --fix-errors requires compilation database (compile_commands.json)
-      # which needs a build. Since this is a no-build workflow, we skip clang-tidy here entirely
-      # (clang-tidy checks are disabled via tidy-checks: ''). Full clang-tidy analysis runs only
-      # in the separate linux-build-with-tidy job.
-      
+
       # Get branch name for PR metadata
       - name: Get branch name
         id: names
@@ -67,7 +62,7 @@ jobs:
           # Create a safe branch name (remove special characters)
           safe_name=$(echo "${{ github.head_ref || github.ref_name }}" | sed 's/[^a-zA-Z0-9-]/_/g')
           echo "safe=$safe_name" >> $GITHUB_OUTPUT
-      
+
       # Create Pull Request with fixes
       - name: Create Pull Request with fixes
         id: cpr
@@ -82,12 +77,12 @@ jobs:
           body: |
             This PR contains automated fixes for code style issues.
             Source branch: `${{ steps.names.outputs.ref }}`
-            
+
             The following fixes were applied:
             - clang-format with LLVM style
           base: ${{ github.event_name == 'workflow_dispatch' && github.event.repository.default_branch || github.base_ref || github.event.repository.default_branch }}
           delete-branch: true
-      
+
       # Fail job if a PR was created (indicating clang-format made fixes)
       # Note: create-pull-request only creates a PR if there are actual changes
       - name: Fail if PR was created
@@ -95,9 +90,9 @@ jobs:
         run: |
           echo "Autofix created a PR: ${{ steps.cpr.outputs.pull-request-url }}"
           exit 1
-      
+
   markdown-metadata:
-    name: Markdown metadata check (no build)
+    name: Markdown metadata checks
     runs-on: ubuntu-latest
 
     steps:
@@ -118,7 +113,7 @@ jobs:
       pull-requests: write
     strategy:
       matrix:
-        php-version: ['7.4', '8.0', '8.1', '8.2', '8.3']
+        php-version: ["7.4", "8.4"]
       fail-fast: false
 
     steps:
@@ -178,7 +173,7 @@ jobs:
             echo "clang-tidy (printer.c) failed with exit code $status_src."
             exit "$status_src"
           fi
-          
+
           # Also check header file
           echo "Running clang-tidy on php_printer.h..."
           clang-tidy --fix-errors \
@@ -223,10 +218,10 @@ jobs:
           body: |
             This PR contains automated fixes from clang-tidy analysis.
             Source branch: `${{ steps.names.outputs.ref }}`
-            
+
             The following fixes were applied:
             - clang-tidy with bugprone, performance, readability, cert, and clang-analyzer checks
-            
+
             This was run on a Linux build with CUPS support.
           base: ${{ github.event_name == 'workflow_dispatch' && github.event.repository.default_branch || github.base_ref || github.event.repository.default_branch }}
           delete-branch: true
