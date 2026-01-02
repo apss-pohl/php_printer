@@ -584,7 +584,7 @@ PHP_FUNCTION(printer_open)
 		resource->dest->options = NULL;
 		
 		if (dest->name) {
-			resource->dest->name = estrdup(dest->name);
+			resource->dest->name = strdup(dest->name);
 			if (!resource->dest->name) {
 				efree(resource->dest);
 				cupsFreeDests(num_dests, dests);
@@ -595,10 +595,10 @@ PHP_FUNCTION(printer_open)
 			}
 		}
 		if (dest->instance) {
-			resource->dest->instance = estrdup(dest->instance);
+			resource->dest->instance = strdup(dest->instance);
 			if (!resource->dest->instance) {
 				if (resource->dest->name) {
-					efree(resource->dest->name);
+					free(resource->dest->name);
 				}
 				efree(resource->dest);
 				cupsFreeDests(num_dests, dests);
