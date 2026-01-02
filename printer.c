@@ -563,10 +563,10 @@ PHP_FUNCTION(printer_open)
 	
 	if (dest) {
 		/* cupsCopyDest returns cups_dest_t* in CUPS 1.6+, int in older versions */
-		#if CUPS_VERSION_MAJOR >= 2 || (CUPS_VERSION_MAJOR == 1 && CUPS_VERSION_MINOR >= 6)
+		#if defined(CUPS_VERSION_MAJOR) && (CUPS_VERSION_MAJOR >= 2 || (CUPS_VERSION_MAJOR == 1 && CUPS_VERSION_MINOR >= 6))
 		resource->dest = cupsCopyDest(dest, 0, NULL);
 		#else
-		/* For older CUPS versions, manually copy the destination */
+		/* For older CUPS versions (or when version macros unavailable), manually copy the destination */
 		resource->dest = (cups_dest_t *)emalloc(sizeof(cups_dest_t));
 		if (resource->dest) {
 			/* Explicitly initialize fields to avoid shallow-copying internal pointers */
@@ -577,6 +577,17 @@ PHP_FUNCTION(printer_open)
 			resource->dest->options = NULL;
 			if (dest->name) resource->dest->name = estrdup(dest->name);
 			if (dest->instance) resource->dest->instance = estrdup(dest->instance);
+			/* Deep-copy printer options to preserve configuration */
+			if (dest->num_options > 0 && dest->options) {
+				resource->dest->num_options = dest->num_options;
+				resource->dest->options = (cups_option_t *)emalloc(dest->num_options * sizeof(cups_option_t));
+				if (resource->dest->options) {
+					for (int i = 0; i < dest->num_options; i++) {
+						resource->dest->options[i].name = dest->options[i].name ? estrdup(dest->options[i].name) : NULL;
+						resource->dest->options[i].value = dest->options[i].value ? estrdup(dest->options[i].value) : NULL;
+					}
+				}
+			}
 		}
 		#endif
 		if (!resource->dest) {

@@ -39,9 +39,9 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       
-      # Auto-fix formatting issues with clang-format
+      # Auto-fix formatting issues with clang-format (only if linter detected issues)
       - name: Apply clang-format fixes
-        if: success() || failure()
+        if: (success() || failure()) && steps.linter.outputs.checks-failed != '0'
         run: |
           # Install clang-format if not available
           sudo apt-get update
@@ -137,17 +137,37 @@ jobs:
       # Apply clang-tidy fixes
       - name: Apply clang-tidy fixes
         run: |
-          # Run clang-tidy with auto-fixes
+          # Run clang-tidy with auto-fixes on source file
+          echo "Running clang-tidy on printer.c..."
           clang-tidy --fix-errors \
             --checks="-*,bugprone-*,performance-*,readability-*,cert-*,clang-analyzer-*" \
             -p . \
-            printer.c || true
+            printer.c
+          status_src=$?
+          if [ "$status_src" -eq 0 ]; then
+            echo "clang-tidy (printer.c): no issues detected."
+          elif [ "$status_src" -eq 1 ]; then
+            echo "clang-tidy (printer.c): diagnostics found and/or fixes applied; continuing."
+          else
+            echo "clang-tidy (printer.c) failed with exit code $status_src."
+            exit "$status_src"
+          fi
           
           # Also check header file
+          echo "Running clang-tidy on php_printer.h..."
           clang-tidy --fix-errors \
             --checks="-*,bugprone-*,performance-*,readability-*,cert-*,clang-analyzer-*" \
             -p . \
-            php_printer.h || true
+            php_printer.h
+          status_hdr=$?
+          if [ "$status_hdr" -eq 0 ]; then
+            echo "clang-tidy (php_printer.h): no issues detected."
+          elif [ "$status_hdr" -eq 1 ]; then
+            echo "clang-tidy (php_printer.h): diagnostics found and/or fixes applied; continuing."
+          else
+            echo "clang-tidy (php_printer.h) failed with exit code $status_hdr."
+            exit "$status_hdr"
+          fi
 
       # Get branch name for PR metadata
       - name: Get branch name
