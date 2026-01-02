@@ -79,39 +79,39 @@ PHP_FUNCTION(printer_abort);
 
 #ifdef PHP_WIN32
 typedef struct {
-	HANDLE handle;
-	LPTSTR name;
-	DOCINFO info;
-	HDC dc;
-	PRINTER_INFO_2 *pi2;
-	DWORD dmModifiedFields;
+  HANDLE handle;
+  LPTSTR name;
+  DOCINFO info;
+  HDC dc;
+  PRINTER_INFO_2 *pi2;
+  DWORD dmModifiedFields;
 } printer;
 #else
 /* Linux/Unix printer structure using CUPS */
 #ifdef HAVE_CUPS
 typedef struct {
-	http_t *http;
-	char *name;
-	char *title;
-	char *datatype;
-	int job_id;
-	cups_dest_t *dest;
-	int num_options;
-	cups_option_t *options;
+  http_t *http;
+  char *name;
+  char *title;
+  char *datatype;
+  int job_id;
+  cups_dest_t *dest;
+  int num_options;
+  cups_option_t *options;
 } printer;
 #else
 /* Dummy structure when CUPS is not available */
 typedef struct {
-	char *name;
-	char *title;
-	char *datatype;
-	int job_id;
+  char *name;
+  char *title;
+  char *datatype;
+  int job_id;
 } printer;
 #endif /* HAVE_CUPS */
 #endif /* PHP_WIN32 */
 
 ZEND_BEGIN_MODULE_GLOBALS(printer)
-	char *default_printer;
+char *default_printer;
 ZEND_END_MODULE_GLOBALS(printer)
 
 #ifdef ZTS
