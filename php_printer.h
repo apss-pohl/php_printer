@@ -41,6 +41,11 @@ extern zend_module_entry printer_module_entry;
 
 #define PHP_PRINTER_VERSION "0.2.0"
 
+/* Compatibility macro for PHP < 8.0 */
+#ifndef RETURN_THROWS
+#define RETURN_THROWS() return
+#endif
+
 PHP_MINIT_FUNCTION(printer);
 PHP_MINFO_FUNCTION(printer);
 PHP_MSHUTDOWN_FUNCTION(printer);
@@ -79,33 +84,33 @@ PHP_FUNCTION(printer_abort);
 
 #ifdef PHP_WIN32
 typedef struct {
-  HANDLE handle;
-  LPTSTR name;
-  DOCINFO info;
-  HDC dc;
-  PRINTER_INFO_2 *pi2;
-  DWORD dmModifiedFields;
+	HANDLE handle;
+	LPTSTR name;
+	DOCINFO info;
+	HDC dc;
+	PRINTER_INFO_2 *pi2;
+	DWORD dmModifiedFields;
 } printer;
 #else
 /* Linux/Unix printer structure using CUPS */
 #ifdef HAVE_CUPS
 typedef struct {
-  http_t *http;
-  char *name;
-  char *title;
-  char *datatype;
-  int job_id;
-  cups_dest_t *dest;
-  int num_options;
-  cups_option_t *options;
+	http_t *http;
+	char *name;
+	char *title;
+	char *datatype;
+	int job_id;
+	cups_dest_t *dest;
+	int num_options;
+	cups_option_t *options;
 } printer;
 #else
 /* Dummy structure when CUPS is not available */
 typedef struct {
-  char *name;
-  char *title;
-  char *datatype;
-  int job_id;
+	char *name;
+	char *title;
+	char *datatype;
+	int job_id;
 } printer;
 #endif /* HAVE_CUPS */
 #endif /* PHP_WIN32 */

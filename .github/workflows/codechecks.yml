@@ -1,43 +1,102 @@
-name: PHP Printer Extension CI (No-Build Checks)
+name: PHP Printer Extension CI
 
 on:
   workflow_dispatch:
+  pull_request:
+    branches: [main]
 
 jobs:
   c-static-analysis:
-    name: C static analysis (no build)
+    name: C static analysis
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: write
 
     steps:
       - name: Checkout repository
         uses: actions/checkout@v6
 
       # C linting only; this does NOT build the extension.
-      # Restrict to C sources in this repo and use a reasonable set of checks.
-      - name: C Linter (clang-tidy/clang-format) – no-build
+      # Only run clang-format checks here (clang-tidy needs build environment)
+      - name: C Linter (clang-format only)
+        id: linter
         uses: cpp-linter/cpp-linter-action@v2
         with:
-          # Limit analysis to actual C sources in this project
-          files: |
-            printer.c
-            php_printer.h
-          # Run clang-tidy with a focused set of checks for C code
-          clang_tidy_checks: >
-            -*,
-            bugprone-*,
-            performance-*,
-            readability-*,
-            cert-*,
-            clang-analyzer-*
-          # Only fail the check on more serious issues
-          fail_on: error
-          # Do not try to auto-fix code; just report
+          # Disable clang-tidy in no-build workflow (runs in linux-build-with-tidy job instead)
+          tidy-checks: ""
+          # Only check C/C++ files (default extensions)
+          extensions: c,h
+          # Use .clang-format file in repository
           style: file
+          # Disable review comments - auto-fix PRs will be created instead
+          tidy-review: false
+          format-review: false
+          # Disable thread comments to avoid cluttering the PR
+          thread-comments: false
+          # Fail the workflow if any issues are found
+          passive-reviews: false
+          # Extra args to handle missing config.h (not built yet in this job)
+          # This allows clang-format to work without a full build environment
+          extra-args: "-UHAVE_CONFIG_H"
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
+      # Auto-fix formatting issues with clang-format (only if linter detected issues)
+      - name: Apply clang-format fixes
+        if: success() && steps.linter.outputs.checks-failed != '0'
+        run: |
+          # Install clang-format if not available
+          sudo apt-get update
+          sudo apt-get install -y clang-format
+
+          # Apply formatting to tracked C files only (avoid vendor/build dirs)
+          # Use --style=file to respect .clang-format configuration
+          git ls-files '*.c' '*.h' | xargs -r clang-format -i --style=file
+
+      # Get branch name for PR metadata
+      - name: Get branch name
+        id: names
+        run: |
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            echo "ref=${{ github.head_ref }}" >> $GITHUB_OUTPUT
+          else
+            echo "ref=${{ github.ref_name }}" >> $GITHUB_OUTPUT
+          fi
+          # Create a safe branch name (remove special characters)
+          safe_name=$(echo "${{ github.head_ref || github.ref_name }}" | sed 's/[^a-zA-Z0-9-]/_/g')
+          echo "safe=$safe_name" >> $GITHUB_OUTPUT
+
+      # Create Pull Request with fixes
+      - name: Create Pull Request with fixes
+        id: cpr
+        if: success() && steps.linter.outputs.checks-failed != '0'
+        uses: peter-evans/create-pull-request@v7
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          commit-message: "refactor: automated code style fixes"
+          branch: auto-fix/${{ steps.names.outputs.safe }}
+          branch-suffix: short-commit-hash
+          title: "Automated code fixes (${{ steps.names.outputs.ref }})"
+          body: |
+            This PR contains automated fixes for code style issues.
+            Source branch: `${{ steps.names.outputs.ref }}`
+
+            The following fixes were applied:
+            - clang-format with project style (.clang-format config)
+          base: ${{ github.event_name == 'pull_request' && github.head_ref || github.event.repository.default_branch }}
+          delete-branch: true
+
+      # Fail job if a PR was created (indicating clang-format made fixes)
+      # Note: create-pull-request only creates a PR if there are actual changes
+      - name: Fail if PR was created
+        if: steps.cpr.outputs.pull-request-operation == 'created'
+        run: |
+          echo "Autofix created a PR: ${{ steps.cpr.outputs.pull-request-url }}"
+          exit 1
+
   markdown-metadata:
-    name: Markdown metadata check (no build)
+    name: Markdown metadata checks
     runs-on: ubuntu-latest
 
     steps:
@@ -49,3 +108,132 @@ jobs:
           echo "Listing key Markdown files (if present):"
           ls README.md || echo "README.md not found"
           ls .github/copilot-instructions.md || echo ".github/copilot-instructions.md not found"
+
+  linux-build-with-tidy:
+    name: Linux build with clang-tidy auto-fixes
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: write
+    strategy:
+      matrix:
+        php-version: ["7.4", "8.4"]
+      fail-fast: false
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v6
+
+      # Setup PHP with development tools using setup-php action
+      # This provides consistent PHP versions and is faster than apt-get
+      - name: Setup PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: ${{ matrix.php-version }}
+          tools: phpize
+          coverage: none
+
+      # Cache apt packages to speed up builds
+      - name: Cache apt packages
+        uses: actions/cache@v4
+        with:
+          path: |
+            /var/cache/apt/archives
+            /var/lib/apt/lists
+          key: ${{ runner.os }}-apt-libcups2-clang-tidy-bear
+          restore-keys: |
+            ${{ runner.os }}-apt-
+
+      # Install CUPS and analysis tools
+      - name: Install build dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libcups2-dev clang-tidy bear
+
+      # Generate compilation database
+      - name: Build extension and generate compilation database
+        run: |
+          phpize
+          # Use bear to intercept build commands and generate compile_commands.json
+          bear -- sh -c './configure --with-cups && make'
+          echo "Compilation database generated"
+          ls -la compile_commands.json
+
+      # Apply clang-tidy fixes
+      - name: Apply clang-tidy fixes
+        run: |
+          # Run clang-tidy with auto-fixes on source file
+          echo "Running clang-tidy on printer.c..."
+          clang-tidy --fix-errors \
+            --checks="-*,bugprone-*,performance-*,readability-*,cert-*,clang-analyzer-*" \
+            -p . \
+            printer.c
+          status_src=$?
+          if [ "$status_src" -eq 0 ]; then
+            echo "clang-tidy (printer.c): no issues detected."
+          elif [ "$status_src" -eq 1 ]; then
+            echo "clang-tidy (printer.c): diagnostics found and/or fixes applied; continuing."
+          else
+            echo "clang-tidy (printer.c) failed with exit code $status_src."
+            exit "$status_src"
+          fi
+
+          # Also check header file
+          echo "Running clang-tidy on php_printer.h..."
+          clang-tidy --fix-errors \
+            --checks="-*,bugprone-*,performance-*,readability-*,cert-*,clang-analyzer-*" \
+            -p . \
+            php_printer.h
+          status_hdr=$?
+          if [ "$status_hdr" -eq 0 ]; then
+            echo "clang-tidy (php_printer.h): no issues detected."
+          elif [ "$status_hdr" -eq 1 ]; then
+            echo "clang-tidy (php_printer.h): diagnostics found and/or fixes applied; continuing."
+          else
+            echo "clang-tidy (php_printer.h) failed with exit code $status_hdr."
+            exit "$status_hdr"
+          fi
+
+      # Get branch name for PR metadata
+      - name: Get branch name
+        id: names
+        run: |
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            echo "ref=${{ github.head_ref }}" >> $GITHUB_OUTPUT
+          else
+            echo "ref=${{ github.ref_name }}" >> $GITHUB_OUTPUT
+          fi
+          # Create a safe branch name (remove special characters)
+          safe_name=$(echo "${{ github.head_ref || github.ref_name }}" | sed 's/[^a-zA-Z0-9-]/_/g')
+          echo "safe=$safe_name" >> $GITHUB_OUTPUT
+
+      # Create Pull Request with clang-tidy fixes
+      # Only create PR from PHP 8.1 build to avoid duplicate PRs
+      - name: Create Pull Request with clang-tidy fixes
+        id: cpr
+        if: success() && matrix.php-version == '8.1'
+        uses: peter-evans/create-pull-request@v7
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          commit-message: "refactor: automated clang-tidy fixes (Linux build)"
+          branch: auto-fix-tidy/${{ steps.names.outputs.safe }}
+          branch-suffix: short-commit-hash
+          title: "Automated clang-tidy fixes - Linux (${{ steps.names.outputs.ref }})"
+          body: |
+            This PR contains automated fixes from clang-tidy analysis.
+            Source branch: `${{ steps.names.outputs.ref }}`
+
+            The following fixes were applied:
+            - clang-tidy with bugprone, performance, readability, cert, and clang-analyzer checks
+
+            This was run on a Linux build with CUPS support.
+          base: ${{ github.event_name == 'pull_request' && github.head_ref || github.event.repository.default_branch }}
+          delete-branch: true
+
+      # Fail job if a PR was created (indicating clang-tidy made fixes)
+      # Note: create-pull-request only creates a PR if there are actual changes
+      - name: Fail if PR was created
+        if: steps.cpr.outputs.pull-request-operation == 'created'
+        run: |
+          echo "Clang-tidy autofix created a PR: ${{ steps.cpr.outputs.pull-request-url }}"
+          exit 1
