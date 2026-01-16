@@ -46,7 +46,7 @@ static int le_printer, le_brush, le_pen, le_font;
 #ifdef HAVE_CUPS
 #include <cups/cups.h>
 #include <cups/ppd.h>
-#include <strings.h>  /* for strcasecmp */
+#include <strings.h> /* for strcasecmp */
 
 /* Define printer enumeration constants for Linux/CUPS compatibility */
 #define PRINTER_ENUM_DEFAULT 1
@@ -550,10 +550,10 @@ PHP_FUNCTION(printer_open)
 		efree(resource);
 		RETURN_FALSE;
 	}
-	
+
 	/* First try exact match */
 	dest = cupsGetDest(resource->name, NULL, num_dests, dests);
-	
+
 	/* If exact match fails, try case-insensitive search */
 	if (!dest) {
 		int i;
@@ -670,21 +670,21 @@ PHP_FUNCTION(printer_open)
 		size_t buffer_size = 0;
 		char *ptr;
 		int i;
-		
+
 		/* Calculate required buffer size for available printer names
 		 * Each printer name + separator ", " for all but the last + null terminator */
 		for (i = 0; i < num_dests; i++) {
 			buffer_size += strlen(dests[i].name);
 			if (i < num_dests - 1) {
-				buffer_size += 2;  /* ", " separator */
+				buffer_size += 2; /* ", " separator */
 			}
 		}
-		
+
 		if (buffer_size > 0) {
-			buffer_size += 1;  /* Final null terminator */
+			buffer_size += 1; /* Final null terminator */
 			available_printers = (char *)emalloc(buffer_size);
 			ptr = available_printers;
-			
+
 			for (i = 0; i < num_dests; i++) {
 				size_t name_len = strlen(dests[i].name);
 				memcpy(ptr, dests[i].name, name_len);
@@ -695,17 +695,15 @@ PHP_FUNCTION(printer_open)
 				}
 			}
 			*ptr = '\0';
-			
-			php_error_docref(NULL, E_WARNING, 
-				"couldn't find printer [%s]. Available printers: %s", 
-				resource->name, available_printers);
+
+			php_error_docref(NULL, E_WARNING, "couldn't find printer [%s]. Available printers: %s", resource->name,
+			                 available_printers);
 			efree(available_printers);
 		} else {
-			php_error_docref(NULL, E_WARNING, 
-				"couldn't find printer [%s]. No printers available in CUPS", 
-				resource->name);
+			php_error_docref(NULL, E_WARNING, "couldn't find printer [%s]. No printers available in CUPS",
+			                 resource->name);
 		}
-		
+
 		cupsFreeDests(num_dests, dests);
 		efree(resource->name);
 		efree(resource);
