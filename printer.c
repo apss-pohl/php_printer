@@ -671,15 +671,17 @@ PHP_FUNCTION(printer_open)
 		char *ptr;
 		int i;
 		
-		/* Calculate required buffer size for available printer names */
+		/* Calculate required buffer size for available printer names
+		 * Each printer name + separator ", " for all but the last + null terminator */
 		for (i = 0; i < num_dests; i++) {
-			/* Each printer name plus separator ", " (2 chars) and final null terminator */
-			buffer_size += strlen(dests[i].name) + 2;
+			buffer_size += strlen(dests[i].name);
+			if (i < num_dests - 1) {
+				buffer_size += 2;  /* ", " separator */
+			}
 		}
 		
 		if (buffer_size > 0) {
-			/* Add space for final null terminator */
-			buffer_size += 1;
+			buffer_size += 1;  /* Final null terminator */
 			available_printers = (char *)emalloc(buffer_size);
 			ptr = available_printers;
 			
