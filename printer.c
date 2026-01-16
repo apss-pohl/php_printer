@@ -615,40 +615,18 @@ PHP_FUNCTION(printer_open)
 
 		/* Manually copy printer options for compatibility across CUPS versions */
 		if (dest->num_options > 0 && dest->options) {
-			int i;
-			resource->dest->options = (cups_option_t *)malloc(dest->num_options * sizeof(cups_option_t));
-			if (!resource->dest->options) {
-				if (resource->dest->name) {
-					free(resource->dest->name);
-				}
-				if (resource->dest->instance) {
-					free(resource->dest->instance);
-				}
-				efree(resource->dest);
-				cupsFreeDests(num_dests, dests);
-				php_error_docref(NULL, E_WARNING, "failed to allocate memory for printer options [%s]", resource->name);
-				efree(resource->name);
-				efree(resource);
-				RETURN_FALSE;
-			}
-
-			resource->dest->num_options = dest->num_options;
+			int i, j, valid_count = 0;
+			
+			/* First pass: count valid options (those with non-NULL names) */
 			for (i = 0; i < dest->num_options; i++) {
-				resource->dest->options[i].name = dest->options[i].name ? strdup(dest->options[i].name) : NULL;
-				resource->dest->options[i].value = dest->options[i].value ? strdup(dest->options[i].value) : NULL;
-				if ((dest->options[i].name && !resource->dest->options[i].name) ||
-				    (dest->options[i].value && !resource->dest->options[i].value)) {
-					/* Clean up on allocation failure */
-					int j;
-					for (j = 0; j <= i; j++) {
-						if (resource->dest->options[j].name) {
-							free(resource->dest->options[j].name);
-						}
-						if (resource->dest->options[j].value) {
-							free(resource->dest->options[j].value);
-						}
-					}
-					free(resource->dest->options);
+				if (dest->options[i].name != NULL) {
+					valid_count++;
+				}
+			}
+			
+			if (valid_count > 0) {
+				resource->dest->options = (cups_option_t *)malloc(valid_count * sizeof(cups_option_t));
+				if (!resource->dest->options) {
 					if (resource->dest->name) {
 						free(resource->dest->name);
 					}
@@ -657,11 +635,52 @@ PHP_FUNCTION(printer_open)
 					}
 					efree(resource->dest);
 					cupsFreeDests(num_dests, dests);
-					php_error_docref(NULL, E_WARNING, "failed to copy printer options for [%s]", resource->name);
+					php_error_docref(NULL, E_WARNING, "failed to allocate memory for printer options [%s]", resource->name);
 					efree(resource->name);
 					efree(resource);
 					RETURN_FALSE;
 				}
+
+				/* Second pass: copy only valid options */
+				j = 0;
+				for (i = 0; i < dest->num_options; i++) {
+					/* Skip options with NULL names */
+					if (dest->options[i].name == NULL) {
+						continue;
+					}
+					
+					resource->dest->options[j].name = strdup(dest->options[i].name);
+					resource->dest->options[j].value = dest->options[i].value ? strdup(dest->options[i].value) : NULL;
+					
+					if (!resource->dest->options[j].name ||
+					    (dest->options[i].value && !resource->dest->options[j].value)) {
+						/* Clean up on allocation failure */
+						int k;
+						for (k = 0; k <= j; k++) {
+							if (resource->dest->options[k].name) {
+								free(resource->dest->options[k].name);
+							}
+							if (resource->dest->options[k].value) {
+								free(resource->dest->options[k].value);
+							}
+						}
+						free(resource->dest->options);
+						if (resource->dest->name) {
+							free(resource->dest->name);
+						}
+						if (resource->dest->instance) {
+							free(resource->dest->instance);
+						}
+						efree(resource->dest);
+						cupsFreeDests(num_dests, dests);
+						php_error_docref(NULL, E_WARNING, "failed to copy printer options for [%s]", resource->name);
+						efree(resource->name);
+						efree(resource);
+						RETURN_FALSE;
+					}
+					j++;
+				}
+				resource->dest->num_options = valid_count;
 			}
 		}
 		resource->http = NULL;
