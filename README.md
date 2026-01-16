@@ -238,7 +238,7 @@ cd ..
 
 ```cmd
 buildconf
-configure --disable-all --enable-cli --enable-printer=shared
+configure --disable-all --enable-cli --enable-printer=shared --disable-zts
 nmake
 ```
 

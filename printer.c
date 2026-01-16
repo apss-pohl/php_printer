@@ -46,6 +46,8 @@ static int le_printer, le_brush, le_pen, le_font;
 #ifdef HAVE_CUPS
 #include <cups/cups.h>
 #include <cups/ppd.h>
+#include <strings.h> /* for strcasecmp */
+#include <stdbool.h> /* for bool, true, false */
 
 /* Define printer enumeration constants for Linux/CUPS compatibility */
 #define PRINTER_ENUM_DEFAULT 1
@@ -549,15 +551,26 @@ PHP_FUNCTION(printer_open)
 		efree(resource);
 		RETURN_FALSE;
 	}
+
+	/* First try exact match */
 	dest = cupsGetDest(resource->name, NULL, num_dests, dests);
 
+	/* If exact match fails, try case-insensitive search */
+	if (!dest) {
+		int i;
+		for (i = 0; i < num_dests; i++) {
+			if (strcasecmp(resource->name, dests[i].name) == 0) {
+				dest = &dests[i];
+				/* Update resource name to match the actual printer name */
+				efree(resource->name);
+				resource->name = estrdup(dests[i].name);
+				break;
+			}
+		}
+	}
+
 	if (dest) {
-/* cupsCopyDest returns cups_dest_t* in CUPS 1.6+, int in older versions */
-#if defined(CUPS_VERSION_MAJOR) && (CUPS_VERSION_MAJOR >= 2 || (CUPS_VERSION_MAJOR == 1 && CUPS_VERSION_MINOR >= 6))
-		resource->dest = cupsCopyDest(dest, 0, NULL);
-#else
-		/* For older CUPS versions (or when version macros unavailable), manually
-		 * copy the destination */
+		/* Manually copy the destination for reliability across all CUPS versions */
 		resource->dest = (cups_dest_t *)emalloc(sizeof(cups_dest_t));
 		if (!resource->dest) {
 			cupsFreeDests(num_dests, dests);
@@ -567,8 +580,7 @@ PHP_FUNCTION(printer_open)
 			RETURN_FALSE;
 		}
 
-		/* Explicitly initialize fields to avoid shallow-copying internal pointers
-		 */
+		/* Explicitly initialize fields to avoid shallow-copying internal pointers */
 		resource->dest->name = NULL;
 		resource->dest->instance = NULL;
 		resource->dest->is_default = dest->is_default;
@@ -602,41 +614,88 @@ PHP_FUNCTION(printer_open)
 			}
 		}
 
-		/* Copy printer options using CUPS API to preserve configuration safely */
+		/* Manually copy printer options for compatibility across CUPS versions */
 		if (dest->num_options > 0 && dest->options) {
-			/* cupsCopyOptions allocates memory for the options array using CUPS
-			 * routines, which must later be freed via cupsFreeOptions/cupsFreeDests.
-			 * The dest->name and dest->instance fields above are allocated via
-			 * strdup() (malloc-based) but remain compatible with cupsFreeDests, which
-			 * uses standard free(). */
-			resource->dest->num_options =
-			    cupsCopyOptions(dest->num_options, dest->options, 0, &resource->dest->options);
-			if (resource->dest->num_options == 0 || !resource->dest->options) {
-				/* Clean up allocated options if any */
-				if (resource->dest->options) {
-					cupsFreeOptions(resource->dest->num_options, resource->dest->options);
+			int i, j, valid_count = 0;
+
+			/* First pass: count valid options (those with non-NULL names) */
+			for (i = 0; i < dest->num_options; i++) {
+				if (dest->options[i].name != NULL) {
+					valid_count++;
 				}
-				if (resource->dest->name) {
-					free(resource->dest->name);
-				}
-				if (resource->dest->instance) {
-					free(resource->dest->instance);
-				}
-				efree(resource->dest);
-				cupsFreeDests(num_dests, dests);
-				php_error_docref(NULL, E_WARNING, "failed to copy printer options for [%s]", resource->name);
-				efree(resource->name);
-				efree(resource);
-				RETURN_FALSE;
 			}
-		}
-#endif
-		if (!resource->dest) {
-			cupsFreeDests(num_dests, dests);
-			php_error_docref(NULL, E_WARNING, "failed to copy printer destination for [%s]", resource->name);
-			efree(resource->name);
-			efree(resource);
-			RETURN_FALSE;
+
+			if (valid_count > 0) {
+				resource->dest->options = (cups_option_t *)malloc(valid_count * sizeof(cups_option_t));
+				if (!resource->dest->options) {
+					if (resource->dest->name) {
+						free(resource->dest->name);
+					}
+					if (resource->dest->instance) {
+						free(resource->dest->instance);
+					}
+					efree(resource->dest);
+					cupsFreeDests(num_dests, dests);
+					php_error_docref(NULL, E_WARNING, "failed to allocate memory for printer options [%s]",
+					                 resource->name);
+					efree(resource->name);
+					efree(resource);
+					RETURN_FALSE;
+				}
+
+				/* Second pass: copy only valid options */
+				j = 0;
+				for (i = 0; i < dest->num_options; i++) {
+					/* Skip options with NULL names */
+					if (dest->options[i].name == NULL) {
+						continue;
+					}
+
+					resource->dest->options[j].name = strdup(dest->options[i].name);
+					if (dest->options[i].value != NULL) {
+						resource->dest->options[j].value = strdup(dest->options[i].value);
+					} else {
+						resource->dest->options[j].value = NULL;
+					}
+
+					if (!resource->dest->options[j].name ||
+					    (dest->options[i].value && !resource->dest->options[j].value)) {
+						/* Clean up on allocation failure */
+						int k;
+						/* First free any partially allocated data for the current option j */
+						if (resource->dest->options[j].name) {
+							free(resource->dest->options[j].name);
+						}
+						if (resource->dest->options[j].value) {
+							free(resource->dest->options[j].value);
+						}
+						/* Then free only the previously successful options [0 .. j-1] */
+						for (k = 0; k < j; k++) {
+							if (resource->dest->options[k].name) {
+								free(resource->dest->options[k].name);
+							}
+							if (resource->dest->options[k].value) {
+								free(resource->dest->options[k].value);
+							}
+						}
+						free(resource->dest->options);
+						if (resource->dest->name) {
+							free(resource->dest->name);
+						}
+						if (resource->dest->instance) {
+							free(resource->dest->instance);
+						}
+						efree(resource->dest);
+						cupsFreeDests(num_dests, dests);
+						php_error_docref(NULL, E_WARNING, "failed to copy printer options for [%s]", resource->name);
+						efree(resource->name);
+						efree(resource);
+						RETURN_FALSE;
+					}
+					j++;
+				}
+				resource->dest->num_options = valid_count;
+			}
 		}
 		resource->http = NULL;
 		resource->job_id = 0;
@@ -648,8 +707,58 @@ PHP_FUNCTION(printer_open)
 		cupsFreeDests(num_dests, dests);
 		RETURN_RES(zend_register_resource(resource, le_printer));
 	} else {
+		/* Printer not found - provide helpful error message with available printers */
+		char *available_printers = NULL;
+		size_t buffer_size = 0;
+		char *ptr;
+		int i, valid_printers = 0;
+
+		/* Calculate required buffer size for available printer names
+		 * Each printer name + separator ", " for all but the last + null terminator */
+		for (i = 0; i < num_dests; i++) {
+			if (dests[i].name != NULL) {
+				buffer_size += strlen(dests[i].name);
+				valid_printers++;
+			}
+		}
+
+		if (valid_printers > 1) {
+			/* ", " separator between valid printer names */
+			buffer_size += 2 * (valid_printers - 1);
+		}
+
+		if (buffer_size > 0) {
+			buffer_size += 1; /* Final null terminator */
+			available_printers = (char *)emalloc(buffer_size);
+			ptr = available_printers;
+
+			if (valid_printers > 0) {
+				bool first = true;
+
+				for (i = 0; i < num_dests; i++) {
+					if (dests[i].name != NULL) {
+						size_t name_len = strlen(dests[i].name);
+						if (!first) {
+							*ptr++ = ',';
+							*ptr++ = ' ';
+						}
+						memcpy(ptr, dests[i].name, name_len);
+						ptr += name_len;
+						first = false;
+					}
+				}
+			}
+			*ptr = '\0';
+
+			php_error_docref(NULL, E_WARNING, "couldn't find printer [%s]. Available printers: %s", resource->name,
+			                 available_printers);
+			efree(available_printers);
+		} else {
+			php_error_docref(NULL, E_WARNING, "couldn't find printer [%s]. No printers available in CUPS",
+			                 resource->name);
+		}
+
 		cupsFreeDests(num_dests, dests);
-		php_error_docref(NULL, E_WARNING, "couldn't connect to the printer [%s]", resource->name);
 		efree(resource->name);
 		efree(resource);
 		RETURN_FALSE;
@@ -711,7 +820,7 @@ PHP_FUNCTION(printer_write)
 	sp = StartPagePrinter(resource->handle);
 
 	if (sd && sp) {
-		WritePrinter(resource->handle, content, content_len, &received);
+		WritePrinter(resource->handle, content, (DWORD)content_len, &received);
 		EndPagePrinter(resource->handle);
 		EndDocPrinter(resource->handle);
 		RETURN_TRUE;
@@ -797,7 +906,7 @@ PHP_FUNCTION(printer_list)
 
 	array_init(return_value);
 
-	EnumPrinters(enumtype, Name, Level, (LPBYTE)InfoBuffer, sizeof(InfoBuffer), &bNeeded, &cReturned);
+	EnumPrinters((DWORD)enumtype, Name, (DWORD)Level, (LPBYTE)InfoBuffer, sizeof(InfoBuffer), &bNeeded, &cReturned);
 
 	P1 = (PRINTER_INFO_1 *)InfoBuffer;
 	P2 = (PRINTER_INFO_2 *)InfoBuffer;
@@ -1059,7 +1168,7 @@ PHP_FUNCTION(printer_set_option)
 
 	case TEXT_ALIGN:
 		convert_to_long(value);
-		SetTextAlign(resource->dc, Z_LVAL_P(value));
+		SetTextAlign(resource->dc, (UINT)Z_LVAL_P(value));
 		break;
 	case VALID_OPTIONS:
 		resource->pi2->pSecurityDescriptor = NULL;
@@ -1325,7 +1434,7 @@ PHP_FUNCTION(printer_create_pen)
 		RETURN_THROWS();
 	}
 
-	pen = CreatePen(style, width, hex_to_rgb(color));
+	pen = CreatePen((int)style, (int)width, hex_to_rgb(color));
 
 	if (!pen) {
 		RETURN_FALSE;
@@ -1401,7 +1510,7 @@ PHP_FUNCTION(printer_create_brush)
 		brush = CreatePatternBrush(bmp);
 		break;
 	default:
-		brush = CreateHatchBrush(style, hex_to_rgb(value));
+		brush = CreateHatchBrush((int)style, hex_to_rgb(value));
 	}
 
 	if (!brush) {
@@ -1462,7 +1571,7 @@ PHP_FUNCTION(printer_create_font)
 	char *face_param;
 	size_t face_len;
 	zend_long height, width, font_weight, orientation;
-	bool italic, underline, strikeout;
+	zend_bool italic, underline, strikeout;
 	HFONT font;
 	char face[33];
 
@@ -1475,9 +1584,9 @@ PHP_FUNCTION(printer_create_font)
 	strncpy(face, face_param, 32);
 	face[32] = '\0';
 
-	font =
-	    CreateFont(height, width, orientation, orientation, font_weight, italic, underline, strikeout, DEFAULT_CHARSET,
-	               OUT_DEFAULT_PRECIS, CLIP_DEFAULT_PRECIS, ANTIALIASED_QUALITY, DEFAULT_PITCH | FF_ROMAN, face);
+	font = CreateFont((int)height, (int)width, (int)orientation, (int)orientation, (int)font_weight, italic, underline,
+	                  strikeout, DEFAULT_CHARSET, OUT_DEFAULT_PRECIS, CLIP_DEFAULT_PRECIS, ANTIALIASED_QUALITY,
+	                  DEFAULT_PITCH | FF_ROMAN, face);
 
 	if (!font) {
 		RETURN_FALSE;
@@ -1545,7 +1654,7 @@ PHP_FUNCTION(printer_logical_fontheight)
 		RETURN_THROWS();
 	}
 
-	RETURN_LONG(MulDiv(height, GetDeviceCaps(resource->dc, LOGPIXELSY), 72));
+	RETURN_LONG(MulDiv((int)height, GetDeviceCaps(resource->dc, LOGPIXELSY), 72));
 }
 /* }}} */
 
@@ -1566,7 +1675,7 @@ PHP_FUNCTION(printer_draw_roundrect)
 		RETURN_THROWS();
 	}
 
-	RoundRect(resource->dc, ul_x, ul_y, lr_x, lr_y, width, height);
+	RoundRect(resource->dc, (int)ul_x, (int)ul_y, (int)lr_x, (int)lr_y, (int)width, (int)height);
 }
 /* }}} */
 
@@ -1586,7 +1695,7 @@ PHP_FUNCTION(printer_draw_rectangle)
 		RETURN_THROWS();
 	}
 
-	Rectangle(resource->dc, ul_x, ul_y, lr_x, lr_y);
+	Rectangle(resource->dc, (int)ul_x, (int)ul_y, (int)lr_x, (int)lr_y);
 }
 /* }}} */
 
@@ -1606,7 +1715,7 @@ PHP_FUNCTION(printer_draw_elipse)
 		RETURN_THROWS();
 	}
 
-	Ellipse(resource->dc, ul_x, ul_y, lr_x, lr_y);
+	Ellipse(resource->dc, (int)ul_x, (int)ul_y, (int)lr_x, (int)lr_y);
 }
 /* }}} */
 
@@ -1628,7 +1737,7 @@ PHP_FUNCTION(printer_draw_text)
 		RETURN_THROWS();
 	}
 
-	ExtTextOut(resource->dc, x, y, ETO_OPAQUE, NULL, text, text_len, NULL);
+	ExtTextOut(resource->dc, (int)x, (int)y, ETO_OPAQUE, NULL, text, (UINT)text_len, NULL);
 }
 /* }}} */
 
@@ -1648,8 +1757,8 @@ PHP_FUNCTION(printer_draw_line)
 		RETURN_THROWS();
 	}
 
-	MoveToEx(resource->dc, fx, fy, NULL);
-	LineTo(resource->dc, tx, ty);
+	MoveToEx(resource->dc, (int)fx, (int)fy, NULL);
+	LineTo(resource->dc, (int)tx, (int)ty);
 }
 /* }}} */
 
@@ -1671,7 +1780,8 @@ PHP_FUNCTION(printer_draw_chord)
 		RETURN_THROWS();
 	}
 
-	Chord(resource->dc, rec_x, rec_y, rec_x1, rec_y1, rad_x, rad_y, rad_x1, rad_y1);
+	Chord(resource->dc, (int)rec_x, (int)rec_y, (int)rec_x1, (int)rec_y1, (int)rad_x, (int)rad_y, (int)rad_x1,
+	      (int)rad_y1);
 }
 /* }}} */
 
@@ -1693,7 +1803,8 @@ PHP_FUNCTION(printer_draw_pie)
 		RETURN_THROWS();
 	}
 
-	Pie(resource->dc, rec_x, rec_y, rec_x1, rec_y1, rad1_x, rad1_y, rad2_x, rad2_y);
+	Pie(resource->dc, (int)rec_x, (int)rec_y, (int)rec_x1, (int)rec_y1, (int)rad1_x, (int)rad1_y, (int)rad2_x,
+	    (int)rad2_y);
 }
 /* }}} */
 
@@ -1761,7 +1872,7 @@ PHP_FUNCTION(printer_draw_bmp)
 			RETURN_FALSE;
 		}
 	} else {
-		if (!BitBlt(resource->dc, x, y, bmp_property.bmWidth, bmp_property.bmHeight, dummy, 0, 0, SRCCOPY)) {
+		if (!BitBlt(resource->dc, (int)x, (int)y, bmp_property.bmWidth, bmp_property.bmHeight, dummy, 0, 0, SRCCOPY)) {
 			php_error_docref(NULL, E_WARNING, "Printer failed to accept bitmap");
 			DeleteDC(dummy);
 			DeleteObject(hbmp);
@@ -2163,10 +2274,39 @@ static void printer_close(zend_resource *resource)
 	}
 #ifdef HAVE_CUPS
 	if (p->dest) {
-		cupsFreeDests(1, p->dest);
+		/* Manually free destination components since we manually allocated them */
+		if (p->dest->name) {
+			free(p->dest->name);
+		}
+		if (p->dest->instance) {
+			free(p->dest->instance);
+		}
+		if (p->dest->options && p->dest->num_options > 0) {
+			int i;
+			for (i = 0; i < p->dest->num_options; i++) {
+				if (p->dest->options[i].name) {
+					free(p->dest->options[i].name);
+				}
+				if (p->dest->options[i].value) {
+					free(p->dest->options[i].value);
+				}
+			}
+			free(p->dest->options);
+		}
+		efree(p->dest);
 	}
-	if (p->options) {
-		cupsFreeOptions(p->num_options, p->options);
+	if (p->options && p->num_options > 0) {
+		/* Manually free options for compatibility across CUPS versions */
+		int i;
+		for (i = 0; i < p->num_options; i++) {
+			if (p->options[i].name) {
+				free(p->options[i].name);
+			}
+			if (p->options[i].value) {
+				free(p->options[i].value);
+			}
+		}
+		free(p->options);
 	}
 #endif
 	efree(p);
