@@ -648,8 +648,38 @@ PHP_FUNCTION(printer_open)
 		cupsFreeDests(num_dests, dests);
 		RETURN_RES(zend_register_resource(resource, le_printer));
 	} else {
+		/* Printer not found - provide helpful error message with available printers */
+		char *available_printers = NULL;
+		size_t buffer_size = 0;
+		int i;
+		
+		/* Calculate required buffer size for available printer names */
+		for (i = 0; i < num_dests; i++) {
+			buffer_size += strlen(dests[i].name) + 4; /* name + ", " or final null */
+		}
+		
+		if (buffer_size > 0) {
+			available_printers = (char *)emalloc(buffer_size);
+			available_printers[0] = '\0';
+			
+			for (i = 0; i < num_dests; i++) {
+				strcat(available_printers, dests[i].name);
+				if (i < num_dests - 1) {
+					strcat(available_printers, ", ");
+				}
+			}
+			
+			php_error_docref(NULL, E_WARNING, 
+				"couldn't find printer [%s]. Available printers: %s", 
+				resource->name, available_printers);
+			efree(available_printers);
+		} else {
+			php_error_docref(NULL, E_WARNING, 
+				"couldn't find printer [%s]. No printers available in CUPS", 
+				resource->name);
+		}
+		
 		cupsFreeDests(num_dests, dests);
-		php_error_docref(NULL, E_WARNING, "couldn't connect to the printer [%s]", resource->name);
 		efree(resource->name);
 		efree(resource);
 		RETURN_FALSE;
