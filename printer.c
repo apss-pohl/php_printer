@@ -650,7 +650,11 @@ PHP_FUNCTION(printer_open)
 					}
 					
 					resource->dest->options[j].name = strdup(dest->options[i].name);
-					resource->dest->options[j].value = dest->options[i].value ? strdup(dest->options[i].value) : NULL;
+					if (dest->options[i].value != NULL) {
+						resource->dest->options[j].value = strdup(dest->options[i].value);
+					} else {
+						resource->dest->options[j].value = NULL;
+					}
 					
 					if (!resource->dest->options[j].name ||
 					    (dest->options[i].value && !resource->dest->options[j].value)) {
