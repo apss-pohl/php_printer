@@ -616,14 +616,14 @@ PHP_FUNCTION(printer_open)
 		/* Manually copy printer options for compatibility across CUPS versions */
 		if (dest->num_options > 0 && dest->options) {
 			int i, j, valid_count = 0;
-			
+
 			/* First pass: count valid options (those with non-NULL names) */
 			for (i = 0; i < dest->num_options; i++) {
 				if (dest->options[i].name != NULL) {
 					valid_count++;
 				}
 			}
-			
+
 			if (valid_count > 0) {
 				resource->dest->options = (cups_option_t *)malloc(valid_count * sizeof(cups_option_t));
 				if (!resource->dest->options) {
@@ -635,7 +635,8 @@ PHP_FUNCTION(printer_open)
 					}
 					efree(resource->dest);
 					cupsFreeDests(num_dests, dests);
-					php_error_docref(NULL, E_WARNING, "failed to allocate memory for printer options [%s]", resource->name);
+					php_error_docref(NULL, E_WARNING, "failed to allocate memory for printer options [%s]",
+					                 resource->name);
 					efree(resource->name);
 					efree(resource);
 					RETURN_FALSE;
@@ -648,14 +649,14 @@ PHP_FUNCTION(printer_open)
 					if (dest->options[i].name == NULL) {
 						continue;
 					}
-					
+
 					resource->dest->options[j].name = strdup(dest->options[i].name);
 					if (dest->options[i].value != NULL) {
 						resource->dest->options[j].value = strdup(dest->options[i].value);
 					} else {
 						resource->dest->options[j].value = NULL;
 					}
-					
+
 					if (!resource->dest->options[j].name ||
 					    (dest->options[i].value && !resource->dest->options[j].value)) {
 						/* Clean up on allocation failure */
