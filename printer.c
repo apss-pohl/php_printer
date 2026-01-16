@@ -818,7 +818,7 @@ PHP_FUNCTION(printer_write)
 	sp = StartPagePrinter(resource->handle);
 
 	if (sd && sp) {
-		WritePrinter(resource->handle, content, content_len, &received);
+		WritePrinter(resource->handle, content, (DWORD)content_len, &received);
 		EndPagePrinter(resource->handle);
 		EndDocPrinter(resource->handle);
 		RETURN_TRUE;
@@ -904,7 +904,7 @@ PHP_FUNCTION(printer_list)
 
 	array_init(return_value);
 
-	EnumPrinters(enumtype, Name, Level, (LPBYTE)InfoBuffer, sizeof(InfoBuffer), &bNeeded, &cReturned);
+	EnumPrinters((DWORD)enumtype, Name, (DWORD)Level, (LPBYTE)InfoBuffer, sizeof(InfoBuffer), &bNeeded, &cReturned);
 
 	P1 = (PRINTER_INFO_1 *)InfoBuffer;
 	P2 = (PRINTER_INFO_2 *)InfoBuffer;
@@ -1166,7 +1166,7 @@ PHP_FUNCTION(printer_set_option)
 
 	case TEXT_ALIGN:
 		convert_to_long(value);
-		SetTextAlign(resource->dc, Z_LVAL_P(value));
+		SetTextAlign(resource->dc, (UINT)Z_LVAL_P(value));
 		break;
 	case VALID_OPTIONS:
 		resource->pi2->pSecurityDescriptor = NULL;
@@ -1432,7 +1432,7 @@ PHP_FUNCTION(printer_create_pen)
 		RETURN_THROWS();
 	}
 
-	pen = CreatePen(style, width, hex_to_rgb(color));
+	pen = CreatePen((int)style, (int)width, hex_to_rgb(color));
 
 	if (!pen) {
 		RETURN_FALSE;
@@ -1508,7 +1508,7 @@ PHP_FUNCTION(printer_create_brush)
 		brush = CreatePatternBrush(bmp);
 		break;
 	default:
-		brush = CreateHatchBrush(style, hex_to_rgb(value));
+		brush = CreateHatchBrush((int)style, hex_to_rgb(value));
 	}
 
 	if (!brush) {
@@ -1569,7 +1569,7 @@ PHP_FUNCTION(printer_create_font)
 	char *face_param;
 	size_t face_len;
 	zend_long height, width, font_weight, orientation;
-	bool italic, underline, strikeout;
+	zend_bool italic, underline, strikeout;
 	HFONT font;
 	char face[33];
 
@@ -1583,7 +1583,7 @@ PHP_FUNCTION(printer_create_font)
 	face[32] = '\0';
 
 	font =
-	    CreateFont(height, width, orientation, orientation, font_weight, italic, underline, strikeout, DEFAULT_CHARSET,
+	    CreateFont((int)height, (int)width, (int)orientation, (int)orientation, (int)font_weight, italic, underline, strikeout, DEFAULT_CHARSET,
 	               OUT_DEFAULT_PRECIS, CLIP_DEFAULT_PRECIS, ANTIALIASED_QUALITY, DEFAULT_PITCH | FF_ROMAN, face);
 
 	if (!font) {
@@ -1652,7 +1652,7 @@ PHP_FUNCTION(printer_logical_fontheight)
 		RETURN_THROWS();
 	}
 
-	RETURN_LONG(MulDiv(height, GetDeviceCaps(resource->dc, LOGPIXELSY), 72));
+	RETURN_LONG(MulDiv((int)height, GetDeviceCaps(resource->dc, LOGPIXELSY), 72));
 }
 /* }}} */
 
@@ -1673,7 +1673,7 @@ PHP_FUNCTION(printer_draw_roundrect)
 		RETURN_THROWS();
 	}
 
-	RoundRect(resource->dc, ul_x, ul_y, lr_x, lr_y, width, height);
+	RoundRect(resource->dc, (int)ul_x, (int)ul_y, (int)lr_x, (int)lr_y, (int)width, (int)height);
 }
 /* }}} */
 
@@ -1693,7 +1693,7 @@ PHP_FUNCTION(printer_draw_rectangle)
 		RETURN_THROWS();
 	}
 
-	Rectangle(resource->dc, ul_x, ul_y, lr_x, lr_y);
+	Rectangle(resource->dc, (int)ul_x, (int)ul_y, (int)lr_x, (int)lr_y);
 }
 /* }}} */
 
@@ -1713,7 +1713,7 @@ PHP_FUNCTION(printer_draw_elipse)
 		RETURN_THROWS();
 	}
 
-	Ellipse(resource->dc, ul_x, ul_y, lr_x, lr_y);
+	Ellipse(resource->dc, (int)ul_x, (int)ul_y, (int)lr_x, (int)lr_y);
 }
 /* }}} */
 
@@ -1735,7 +1735,7 @@ PHP_FUNCTION(printer_draw_text)
 		RETURN_THROWS();
 	}
 
-	ExtTextOut(resource->dc, x, y, ETO_OPAQUE, NULL, text, text_len, NULL);
+	ExtTextOut(resource->dc, (int)x, (int)y, ETO_OPAQUE, NULL, text, (UINT)text_len, NULL);
 }
 /* }}} */
 
@@ -1755,8 +1755,8 @@ PHP_FUNCTION(printer_draw_line)
 		RETURN_THROWS();
 	}
 
-	MoveToEx(resource->dc, fx, fy, NULL);
-	LineTo(resource->dc, tx, ty);
+	MoveToEx(resource->dc, (int)fx, (int)fy, NULL);
+	LineTo(resource->dc, (int)tx, (int)ty);
 }
 /* }}} */
 
@@ -1778,7 +1778,7 @@ PHP_FUNCTION(printer_draw_chord)
 		RETURN_THROWS();
 	}
 
-	Chord(resource->dc, rec_x, rec_y, rec_x1, rec_y1, rad_x, rad_y, rad_x1, rad_y1);
+	Chord(resource->dc, (int)rec_x, (int)rec_y, (int)rec_x1, (int)rec_y1, (int)rad_x, (int)rad_y, (int)rad_x1, (int)rad_y1);
 }
 /* }}} */
 
@@ -1800,7 +1800,7 @@ PHP_FUNCTION(printer_draw_pie)
 		RETURN_THROWS();
 	}
 
-	Pie(resource->dc, rec_x, rec_y, rec_x1, rec_y1, rad1_x, rad1_y, rad2_x, rad2_y);
+	Pie(resource->dc, (int)rec_x, (int)rec_y, (int)rec_x1, (int)rec_y1, (int)rad1_x, (int)rad1_y, (int)rad2_x, (int)rad2_y);
 }
 /* }}} */
 
@@ -1868,7 +1868,7 @@ PHP_FUNCTION(printer_draw_bmp)
 			RETURN_FALSE;
 		}
 	} else {
-		if (!BitBlt(resource->dc, x, y, bmp_property.bmWidth, bmp_property.bmHeight, dummy, 0, 0, SRCCOPY)) {
+		if (!BitBlt(resource->dc, (int)x, (int)y, bmp_property.bmWidth, bmp_property.bmHeight, dummy, 0, 0, SRCCOPY)) {
 			php_error_docref(NULL, E_WARNING, "Printer failed to accept bitmap");
 			DeleteDC(dummy);
 			DeleteObject(hbmp);
