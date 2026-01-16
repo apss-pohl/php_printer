@@ -46,6 +46,7 @@ static int le_printer, le_brush, le_pen, le_font;
 #ifdef HAVE_CUPS
 #include <cups/cups.h>
 #include <cups/ppd.h>
+#include <strings.h>  /* for strcasecmp */
 
 /* Define printer enumeration constants for Linux/CUPS compatibility */
 #define PRINTER_ENUM_DEFAULT 1
@@ -667,23 +668,31 @@ PHP_FUNCTION(printer_open)
 		/* Printer not found - provide helpful error message with available printers */
 		char *available_printers = NULL;
 		size_t buffer_size = 0;
+		char *ptr;
 		int i;
 		
 		/* Calculate required buffer size for available printer names */
 		for (i = 0; i < num_dests; i++) {
-			buffer_size += strlen(dests[i].name) + 4; /* name + ", " or final null */
+			/* Each printer name plus separator ", " (2 chars) and final null terminator */
+			buffer_size += strlen(dests[i].name) + 2;
 		}
 		
 		if (buffer_size > 0) {
+			/* Add space for final null terminator */
+			buffer_size += 1;
 			available_printers = (char *)emalloc(buffer_size);
-			available_printers[0] = '\0';
+			ptr = available_printers;
 			
 			for (i = 0; i < num_dests; i++) {
-				strcat(available_printers, dests[i].name);
+				size_t name_len = strlen(dests[i].name);
+				memcpy(ptr, dests[i].name, name_len);
+				ptr += name_len;
 				if (i < num_dests - 1) {
-					strcat(available_printers, ", ");
+					*ptr++ = ',';
+					*ptr++ = ' ';
 				}
 			}
+			*ptr = '\0';
 			
 			php_error_docref(NULL, E_WARNING, 
 				"couldn't find printer [%s]. Available printers: %s", 
