@@ -46,6 +46,7 @@ static int le_printer, le_brush, le_pen, le_font;
 #ifdef HAVE_CUPS
 #include <cups/cups.h>
 #include <cups/ppd.h>
+#include <strings.h>  /* for strcasecmp */
 
 /* Define printer enumeration constants for Linux/CUPS compatibility */
 #define PRINTER_ENUM_DEFAULT 1
@@ -549,15 +550,26 @@ PHP_FUNCTION(printer_open)
 		efree(resource);
 		RETURN_FALSE;
 	}
+	
+	/* First try exact match */
 	dest = cupsGetDest(resource->name, NULL, num_dests, dests);
+	
+	/* If exact match fails, try case-insensitive search */
+	if (!dest) {
+		int i;
+		for (i = 0; i < num_dests; i++) {
+			if (strcasecmp(resource->name, dests[i].name) == 0) {
+				dest = &dests[i];
+				/* Update resource name to match the actual printer name */
+				efree(resource->name);
+				resource->name = estrdup(dests[i].name);
+				break;
+			}
+		}
+	}
 
 	if (dest) {
-/* cupsCopyDest returns cups_dest_t* in CUPS 1.6+, int in older versions */
-#if defined(CUPS_VERSION_MAJOR) && (CUPS_VERSION_MAJOR >= 2 || (CUPS_VERSION_MAJOR == 1 && CUPS_VERSION_MINOR >= 6))
-		resource->dest = cupsCopyDest(dest, 0, NULL);
-#else
-		/* For older CUPS versions (or when version macros unavailable), manually
-		 * copy the destination */
+		/* Manually copy the destination for reliability across all CUPS versions */
 		resource->dest = (cups_dest_t *)emalloc(sizeof(cups_dest_t));
 		if (!resource->dest) {
 			cupsFreeDests(num_dests, dests);
@@ -567,8 +579,7 @@ PHP_FUNCTION(printer_open)
 			RETURN_FALSE;
 		}
 
-		/* Explicitly initialize fields to avoid shallow-copying internal pointers
-		 */
+		/* Explicitly initialize fields to avoid shallow-copying internal pointers */
 		resource->dest->name = NULL;
 		resource->dest->instance = NULL;
 		resource->dest->is_default = dest->is_default;
@@ -602,20 +613,11 @@ PHP_FUNCTION(printer_open)
 			}
 		}
 
-		/* Copy printer options using CUPS API to preserve configuration safely */
+		/* Manually copy printer options for compatibility across CUPS versions */
 		if (dest->num_options > 0 && dest->options) {
-			/* cupsCopyOptions allocates memory for the options array using CUPS
-			 * routines, which must later be freed via cupsFreeOptions/cupsFreeDests.
-			 * The dest->name and dest->instance fields above are allocated via
-			 * strdup() (malloc-based) but remain compatible with cupsFreeDests, which
-			 * uses standard free(). */
-			resource->dest->num_options =
-			    cupsCopyOptions(dest->num_options, dest->options, 0, &resource->dest->options);
-			if (resource->dest->num_options == 0 || !resource->dest->options) {
-				/* Clean up allocated options if any */
-				if (resource->dest->options) {
-					cupsFreeOptions(resource->dest->num_options, resource->dest->options);
-				}
+			int i;
+			resource->dest->options = (cups_option_t *)malloc(dest->num_options * sizeof(cups_option_t));
+			if (!resource->dest->options) {
 				if (resource->dest->name) {
 					free(resource->dest->name);
 				}
@@ -624,19 +626,43 @@ PHP_FUNCTION(printer_open)
 				}
 				efree(resource->dest);
 				cupsFreeDests(num_dests, dests);
-				php_error_docref(NULL, E_WARNING, "failed to copy printer options for [%s]", resource->name);
+				php_error_docref(NULL, E_WARNING, "failed to allocate memory for printer options [%s]", resource->name);
 				efree(resource->name);
 				efree(resource);
 				RETURN_FALSE;
 			}
-		}
-#endif
-		if (!resource->dest) {
-			cupsFreeDests(num_dests, dests);
-			php_error_docref(NULL, E_WARNING, "failed to copy printer destination for [%s]", resource->name);
-			efree(resource->name);
-			efree(resource);
-			RETURN_FALSE;
+			
+			resource->dest->num_options = dest->num_options;
+			for (i = 0; i < dest->num_options; i++) {
+				resource->dest->options[i].name = dest->options[i].name ? strdup(dest->options[i].name) : NULL;
+				resource->dest->options[i].value = dest->options[i].value ? strdup(dest->options[i].value) : NULL;
+				if ((dest->options[i].name && !resource->dest->options[i].name) || 
+				    (dest->options[i].value && !resource->dest->options[i].value)) {
+					/* Clean up on allocation failure */
+					int j;
+					for (j = 0; j <= i; j++) {
+						if (resource->dest->options[j].name) {
+							free(resource->dest->options[j].name);
+						}
+						if (resource->dest->options[j].value) {
+							free(resource->dest->options[j].value);
+						}
+					}
+					free(resource->dest->options);
+					if (resource->dest->name) {
+						free(resource->dest->name);
+					}
+					if (resource->dest->instance) {
+						free(resource->dest->instance);
+					}
+					efree(resource->dest);
+					cupsFreeDests(num_dests, dests);
+					php_error_docref(NULL, E_WARNING, "failed to copy printer options for [%s]", resource->name);
+					efree(resource->name);
+					efree(resource);
+					RETURN_FALSE;
+				}
+			}
 		}
 		resource->http = NULL;
 		resource->job_id = 0;
@@ -648,8 +674,48 @@ PHP_FUNCTION(printer_open)
 		cupsFreeDests(num_dests, dests);
 		RETURN_RES(zend_register_resource(resource, le_printer));
 	} else {
+		/* Printer not found - provide helpful error message with available printers */
+		char *available_printers = NULL;
+		size_t buffer_size = 0;
+		char *ptr;
+		int i;
+		
+		/* Calculate required buffer size for available printer names
+		 * Each printer name + separator ", " for all but the last + null terminator */
+		for (i = 0; i < num_dests; i++) {
+			buffer_size += strlen(dests[i].name);
+			if (i < num_dests - 1) {
+				buffer_size += 2;  /* ", " separator */
+			}
+		}
+		
+		if (buffer_size > 0) {
+			buffer_size += 1;  /* Final null terminator */
+			available_printers = (char *)emalloc(buffer_size);
+			ptr = available_printers;
+			
+			for (i = 0; i < num_dests; i++) {
+				size_t name_len = strlen(dests[i].name);
+				memcpy(ptr, dests[i].name, name_len);
+				ptr += name_len;
+				if (i < num_dests - 1) {
+					*ptr++ = ',';
+					*ptr++ = ' ';
+				}
+			}
+			*ptr = '\0';
+			
+			php_error_docref(NULL, E_WARNING, 
+				"couldn't find printer [%s]. Available printers: %s", 
+				resource->name, available_printers);
+			efree(available_printers);
+		} else {
+			php_error_docref(NULL, E_WARNING, 
+				"couldn't find printer [%s]. No printers available in CUPS", 
+				resource->name);
+		}
+		
 		cupsFreeDests(num_dests, dests);
-		php_error_docref(NULL, E_WARNING, "couldn't connect to the printer [%s]", resource->name);
 		efree(resource->name);
 		efree(resource);
 		RETURN_FALSE;
@@ -2163,10 +2229,39 @@ static void printer_close(zend_resource *resource)
 	}
 #ifdef HAVE_CUPS
 	if (p->dest) {
-		cupsFreeDests(1, p->dest);
+		/* Manually free destination components since we manually allocated them */
+		if (p->dest->name) {
+			free(p->dest->name);
+		}
+		if (p->dest->instance) {
+			free(p->dest->instance);
+		}
+		if (p->dest->options && p->dest->num_options > 0) {
+			int i;
+			for (i = 0; i < p->dest->num_options; i++) {
+				if (p->dest->options[i].name) {
+					free(p->dest->options[i].name);
+				}
+				if (p->dest->options[i].value) {
+					free(p->dest->options[i].value);
+				}
+			}
+			free(p->dest->options);
+		}
+		efree(p->dest);
 	}
-	if (p->options) {
-		cupsFreeOptions(p->num_options, p->options);
+	if (p->options && p->num_options > 0) {
+		/* Manually free options for compatibility across CUPS versions */
+		int i;
+		for (i = 0; i < p->num_options; i++) {
+			if (p->options[i].name) {
+				free(p->options[i].name);
+			}
+			if (p->options[i].value) {
+				free(p->options[i].value);
+			}
+		}
+		free(p->options);
 	}
 #endif
 	efree(p);
