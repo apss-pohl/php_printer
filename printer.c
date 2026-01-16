@@ -678,15 +678,20 @@ PHP_FUNCTION(printer_open)
 		char *available_printers = NULL;
 		size_t buffer_size = 0;
 		char *ptr;
-		int i;
+		int i, valid_printers = 0;
 
 		/* Calculate required buffer size for available printer names
 		 * Each printer name + separator ", " for all but the last + null terminator */
 		for (i = 0; i < num_dests; i++) {
-			buffer_size += strlen(dests[i].name);
-			if (i < num_dests - 1) {
-				buffer_size += 2; /* ", " separator */
+			if (dests[i].name != NULL) {
+				buffer_size += strlen(dests[i].name);
+				valid_printers++;
 			}
+		}
+
+		if (valid_printers > 1) {
+			/* ", " separator between valid printer names */
+			buffer_size += 2 * (valid_printers - 1);
 		}
 
 		if (buffer_size > 0) {
@@ -694,13 +699,20 @@ PHP_FUNCTION(printer_open)
 			available_printers = (char *)emalloc(buffer_size);
 			ptr = available_printers;
 
-			for (i = 0; i < num_dests; i++) {
-				size_t name_len = strlen(dests[i].name);
-				memcpy(ptr, dests[i].name, name_len);
-				ptr += name_len;
-				if (i < num_dests - 1) {
-					*ptr++ = ',';
-					*ptr++ = ' ';
+			if (valid_printers > 0) {
+				zend_bool first = 1;
+
+				for (i = 0; i < num_dests; i++) {
+					if (dests[i].name != NULL) {
+						size_t name_len = strlen(dests[i].name);
+						if (!first) {
+							*ptr++ = ',';
+							*ptr++ = ' ';
+						}
+						memcpy(ptr, dests[i].name, name_len);
+						ptr += name_len;
+						first = 0;
+					}
 				}
 			}
 			*ptr = '\0';
