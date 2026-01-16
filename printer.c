@@ -549,7 +549,23 @@ PHP_FUNCTION(printer_open)
 		efree(resource);
 		RETURN_FALSE;
 	}
+	
+	/* First try exact match */
 	dest = cupsGetDest(resource->name, NULL, num_dests, dests);
+	
+	/* If exact match fails, try case-insensitive search */
+	if (!dest) {
+		int i;
+		for (i = 0; i < num_dests; i++) {
+			if (strcasecmp(resource->name, dests[i].name) == 0) {
+				dest = &dests[i];
+				/* Update resource name to match the actual printer name */
+				efree(resource->name);
+				resource->name = estrdup(dests[i].name);
+				break;
+			}
+		}
+	}
 
 	if (dest) {
 /* cupsCopyDest returns cups_dest_t* in CUPS 1.6+, int in older versions */
