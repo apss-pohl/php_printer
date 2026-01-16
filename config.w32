@@ -3,7 +3,7 @@
 
 ARG_ENABLE("printer", "Printer Support", "no");
 
-if (PHP_PRINTER == "yes") {
+if (PHP_PRINTER != "no") {
 	CHECK_LIB('winspool.lib', 'printer');
 	CHECK_LIB('gdi32.lib', 'printer');
 	EXTENSION("printer", "printer.c", PHP_PRINTER_SHARED);
