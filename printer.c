@@ -660,7 +660,15 @@ PHP_FUNCTION(printer_open)
 					    (dest->options[i].value && !resource->dest->options[j].value)) {
 						/* Clean up on allocation failure */
 						int k;
-						for (k = 0; k <= j; k++) {
+						/* First free any partially allocated data for the current option j */
+						if (resource->dest->options[j].name) {
+							free(resource->dest->options[j].name);
+						}
+						if (resource->dest->options[j].value) {
+							free(resource->dest->options[j].value);
+						}
+						/* Then free only the previously successful options [0 .. j-1] */
+						for (k = 0; k < j; k++) {
 							if (resource->dest->options[k].name) {
 								free(resource->dest->options[k].name);
 							}
