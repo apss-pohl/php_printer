@@ -1526,7 +1526,7 @@ PHP_FUNCTION(printer_create_font)
 	char *face_param;
 	size_t face_len;
 	zend_long height, width, font_weight, orientation;
-	bool italic, underline, strikeout;
+	zend_bool italic, underline, strikeout;
 	HFONT font;
 	char face[33];
 
